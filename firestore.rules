@@ -1,0 +1,200 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function validBase(data, documentId) {
+      return data.id is string
+        && data.id == documentId
+        && data.id.size() > 0
+        && data.id.size() <= 200
+        && data.created_at is string
+        && data.created_at.size() >= 10
+        && data.created_at.size() <= 40;
+    }
+
+    function validText(value, maximum) {
+      return value is string && value.size() <= maximum;
+    }
+
+    function validDate(value) {
+      return value is string && value.size() == 10;
+    }
+
+    function validAmount(value) {
+      return value is number && value > 0 && value <= 1000000000000;
+    }
+
+    function validOptionalId(value) {
+      return value == null || (value is string && value.size() <= 200);
+    }
+
+    match /users/{userId}/accounts/{documentId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasAll(['id', 'created_at', 'name', 'type', 'balance', 'color', 'icon', 'description'])
+        && request.resource.data.keys().hasOnly(['id', 'created_at', 'name', 'type', 'balance', 'color', 'icon', 'description'])
+        && validBase(request.resource.data, documentId)
+        && validText(request.resource.data.name, 200)
+        && request.resource.data.name.size() > 0
+        && request.resource.data.type in ['current', 'savings', 'cash', 'investment', 'other']
+        && request.resource.data.balance is number
+        && request.resource.data.balance >= -1000000000000
+        && request.resource.data.balance <= 1000000000000
+        && validText(request.resource.data.color, 20)
+        && validText(request.resource.data.icon, 80)
+        && validText(request.resource.data.description, 2000);
+    }
+
+    match /users/{userId}/transactions/{documentId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasAll(['id', 'created_at', 'amount', 'type', 'category_id', 'account_id', 'to_account_id', 'date', 'time', 'description', 'note'])
+        && request.resource.data.keys().hasOnly(['id', 'created_at', 'amount', 'type', 'category_id', 'account_id', 'to_account_id', 'source_event_id', 'date', 'time', 'description', 'note'])
+        && validBase(request.resource.data, documentId)
+        && validAmount(request.resource.data.amount)
+        && request.resource.data.type in ['expense', 'income', 'transfer']
+        && validOptionalId(request.resource.data.category_id)
+        && validText(request.resource.data.account_id, 200)
+        && request.resource.data.account_id.size() > 0
+        && validOptionalId(request.resource.data.to_account_id)
+        && (!('source_event_id' in request.resource.data) || validOptionalId(request.resource.data.source_event_id))
+        && validDate(request.resource.data.date)
+        && validText(request.resource.data.time, 5)
+        && validText(request.resource.data.description, 200)
+        && request.resource.data.description.size() > 0
+        && validText(request.resource.data.note, 2000)
+        && (request.resource.data.type != 'transfer'
+          || (request.resource.data.to_account_id is string
+            && request.resource.data.to_account_id.size() > 0
+            && request.resource.data.to_account_id != request.resource.data.account_id));
+    }
+
+    match /users/{userId}/categories/{documentId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasAll(['id', 'created_at', 'name', 'icon', 'color'])
+        && request.resource.data.keys().hasOnly(['id', 'created_at', 'name', 'icon', 'color'])
+        && validBase(request.resource.data, documentId)
+        && validText(request.resource.data.name, 200)
+        && request.resource.data.name.size() > 0
+        && validText(request.resource.data.icon, 80)
+        && validText(request.resource.data.color, 20);
+    }
+
+    function validSchedule(data, documentId) {
+      return validBase(data, documentId)
+        && validText(data.name, 200)
+        && data.name.size() > 0
+        && validAmount(data.amount)
+        && data.frequency in ['daily', 'weekly', 'monthly', 'yearly', 'custom']
+        && data.interval_days is int
+        && data.interval_days >= 1
+        && data.interval_days <= 3650
+        && validDate(data.next_date)
+        && validText(data.account_id, 200)
+        && data.account_id.size() > 0
+        && validOptionalId(data.category_id)
+        && data.active is bool;
+    }
+
+    match /users/{userId}/subscriptions/{documentId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasAll(['id', 'created_at', 'name', 'amount', 'frequency', 'interval_days', 'next_date', 'category_id', 'account_id', 'icon', 'color', 'active'])
+        && request.resource.data.keys().hasOnly(['id', 'created_at', 'name', 'amount', 'frequency', 'interval_days', 'next_date', 'category_id', 'account_id', 'icon', 'color', 'active'])
+        && validSchedule(request.resource.data, documentId)
+        && validText(request.resource.data.icon, 80)
+        && validText(request.resource.data.color, 20);
+    }
+
+    match /users/{userId}/recurringTransactions/{documentId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasAll(['id', 'created_at', 'name', 'amount', 'type', 'frequency', 'interval_days', 'next_date', 'account_id', 'to_account_id', 'category_id', 'active'])
+        && request.resource.data.keys().hasOnly(['id', 'created_at', 'name', 'amount', 'type', 'frequency', 'interval_days', 'next_date', 'account_id', 'to_account_id', 'category_id', 'active'])
+        && validSchedule(request.resource.data, documentId)
+        && request.resource.data.type in ['expense', 'income', 'transfer']
+        && validOptionalId(request.resource.data.to_account_id)
+        && (request.resource.data.type != 'transfer'
+          || (request.resource.data.to_account_id is string
+            && request.resource.data.to_account_id.size() > 0
+            && request.resource.data.to_account_id != request.resource.data.account_id));
+    }
+
+    match /users/{userId}/budgets/{documentId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasAll(['id', 'created_at', 'month', 'amount'])
+        && request.resource.data.keys().hasOnly(['id', 'created_at', 'month', 'amount'])
+        && validBase(request.resource.data, documentId)
+        && validDate(request.resource.data.month)
+        && validAmount(request.resource.data.amount);
+    }
+
+    match /users/{userId}/budgetCategories/{documentId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasAll(['id', 'created_at', 'budget_id', 'category_id', 'amount'])
+        && request.resource.data.keys().hasOnly(['id', 'created_at', 'budget_id', 'category_id', 'amount'])
+        && validBase(request.resource.data, documentId)
+        && validText(request.resource.data.budget_id, 200)
+        && request.resource.data.budget_id.size() > 0
+        && validText(request.resource.data.category_id, 200)
+        && request.resource.data.category_id.size() > 0
+        && validAmount(request.resource.data.amount);
+    }
+
+    match /users/{userId}/savingsGoals/{documentId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasAll(['id', 'created_at', 'name', 'amount', 'target_date', 'color', 'icon'])
+        && request.resource.data.keys().hasOnly(['id', 'created_at', 'name', 'amount', 'target_date', 'color', 'icon'])
+        && validBase(request.resource.data, documentId)
+        && validText(request.resource.data.name, 200)
+        && request.resource.data.name.size() > 0
+        && validAmount(request.resource.data.amount)
+        && (request.resource.data.target_date == null || validDate(request.resource.data.target_date))
+        && validText(request.resource.data.color, 20)
+        && validText(request.resource.data.icon, 80);
+    }
+
+    match /users/{userId}/goalTransactions/{documentId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasAll(['id', 'created_at', 'goal_id', 'amount', 'date', 'note'])
+        && request.resource.data.keys().hasOnly(['id', 'created_at', 'goal_id', 'amount', 'date', 'note'])
+        && validBase(request.resource.data, documentId)
+        && validText(request.resource.data.goal_id, 200)
+        && request.resource.data.goal_id.size() > 0
+        && request.resource.data.amount is number
+        && request.resource.data.amount != 0
+        && request.resource.data.amount >= -1000000000000
+        && request.resource.data.amount <= 1000000000000
+        && validDate(request.resource.data.date)
+        && validText(request.resource.data.note, 2000);
+    }
+
+    match /users/{userId}/settings/{documentId} {
+      allow read, delete: if isOwner(userId) && documentId == 'preferences';
+      allow create, update: if isOwner(userId)
+        && documentId == 'preferences'
+        && request.resource.data.keys().hasAll(['id', 'created_at', 'name', 'currency', 'theme', 'budget_day'])
+        && request.resource.data.keys().hasOnly(['id', 'created_at', 'name', 'currency', 'theme', 'budget_day'])
+        && validBase(request.resource.data, documentId)
+        && validText(request.resource.data.name, 50)
+        && request.resource.data.currency is string
+        && request.resource.data.currency.size() == 3
+        && request.resource.data.theme in ['light', 'dark', 'system']
+        && request.resource.data.budget_day is int
+        && request.resource.data.budget_day >= 1
+        && request.resource.data.budget_day <= 28;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
