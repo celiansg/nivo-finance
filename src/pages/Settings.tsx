@@ -12,7 +12,9 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
   const { user, logout } = useAuth();
   const initial = data.settings[0];
   const [name, setName] = useState(initial?.name ?? ''),
-    [theme, setTheme] = useState<SettingsType['theme']>(initial?.theme ?? 'system'),
+    [theme, setTheme] = useState<SettingsType['theme']>(
+      initial?.theme === 'dark' ? 'dark' : 'light',
+    ),
     [currency, setCurrency] = useState(initial?.currency ?? 'EUR'),
     [day, setDay] = useState(initial?.budget_day ?? 1),
     [busy, setBusy] = useState(false),
@@ -120,7 +122,6 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
                 >
                   <option value="light">Clair</option>
                   <option value="dark">Sombre</option>
-                  <option value="system">Système</option>
                 </select>
               </label>
               <label className="field">

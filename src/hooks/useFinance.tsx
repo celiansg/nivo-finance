@@ -137,14 +137,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   }, [user?.uid, authLoading]);
 
   useEffect(() => {
-    const theme = data.settings[0]?.theme ?? 'system';
-    const media = matchMedia('(prefers-color-scheme: dark)');
-    const apply = () =>
-      (document.documentElement.dataset.theme =
-        theme === 'system' ? (media.matches ? 'dark' : 'light') : theme);
-    apply();
-    media.addEventListener('change', apply);
-    return () => media.removeEventListener('change', apply);
+    document.documentElement.dataset.theme = data.settings[0]?.theme === 'dark' ? 'dark' : 'light';
+    return () => {
+      document.documentElement.dataset.theme = 'light';
+    };
   }, [data.settings]);
 
   async function save<K extends Table>(table: K, record: Tables[K]) {

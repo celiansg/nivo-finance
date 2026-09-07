@@ -81,7 +81,7 @@ export async function ensureUserDefaults(data: Data) {
       created_at: new Date().toISOString(),
       name: '',
       currency: 'EUR',
-      theme: 'system',
+      theme: 'light',
       budget_day: 1,
     };
     batch.set(userDocument('settings', settings.id), settings);
