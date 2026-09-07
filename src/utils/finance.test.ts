@@ -3,6 +3,7 @@ import { emptyData, type Account, type Recurring, type Transaction } from '../ty
 import {
   accountBalance,
   advance,
+  dueIncomePostings,
   history,
   monthlyCost,
   occurrences,
@@ -106,6 +107,40 @@ describe('Calendrier', () => {
   });
   it('calcule la période budgétaire avant son jour de début', () => {
     expect(period(new Date(2026, 8, 5), 10)).toEqual({ start: '2026-08-10', end: '2026-09-09' });
+  });
+  it('prépare le salaire dû et avance sa prochaine date', () => {
+    const d = emptyData();
+    d.recurring_transactions = [
+      { ...recurring, id: 'salary', name: 'Salaire', type: 'income', next_date: '2026-09-05' },
+    ];
+    const plan = dueIncomePostings(d, '2026-09-05', '2026-09-05T08:00:00.000Z');
+    expect(plan.transactions).toMatchObject([
+      {
+        id: 'salary-2026-09-05',
+        source_event_id: 'salary-2026-09-05',
+        amount: 100,
+        type: 'income',
+        date: '2026-09-05',
+      },
+    ]);
+    expect(plan.updates[0].next_date).toBe('2026-10-05');
+  });
+  it('ne recrée pas un salaire déjà ajouté', () => {
+    const d = emptyData();
+    d.recurring_transactions = [
+      { ...recurring, id: 'salary', type: 'income', next_date: '2026-09-05' },
+    ];
+    d.transactions = [
+      {
+        ...tx,
+        id: 'salary-2026-09-05',
+        type: 'income',
+        source_event_id: 'salary-2026-09-05',
+      },
+    ];
+    const plan = dueIncomePostings(d, '2026-09-05');
+    expect(plan.transactions).toEqual([]);
+    expect(plan.updates[0].next_date).toBe('2026-10-05');
   });
 });
 describe('Prévisions', () => {

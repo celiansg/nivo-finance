@@ -5,6 +5,7 @@ import {
   deleteRecords,
   ensureUserDefaults,
   fetchData,
+  postDueRecurringIncome,
   restoreData,
   saveRecord,
   subscribeData,
@@ -119,6 +120,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         if (initialized) return;
         initialized = true;
         void ensureUserDefaults(initialData)
+          .then(() => postDueRecurringIncome(initialData))
+          .then((posted) => {
+            if (posted)
+              notify(
+                posted === 1
+                  ? 'Revenu récurrent ajouté automatiquement'
+                  : `${posted} revenus récurrents ajoutés automatiquement`,
+              );
+          })
           .catch((cause: unknown) => setError(dataError(cause)))
           .finally(() => setLoading(false));
       },
@@ -142,8 +152,20 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setSyncState(navigator.onLine ? 'connecting' : 'offline');
     try {
       await saveRecord(table, record);
+      let posted = 0;
+      if (table === 'recurring_transactions') {
+        const recurring = record as Tables['recurring_transactions'];
+        if (recurring.type === 'income' && recurring.active)
+          posted = await postDueRecurringIncome({
+            ...data,
+            recurring_transactions: [
+              ...data.recurring_transactions.filter((item) => item.id !== recurring.id),
+              recurring,
+            ],
+          });
+      }
       setSyncState('synced');
-      notify('Modification enregistrée');
+      notify(posted ? 'Revenu ajouté automatiquement' : 'Modification enregistrée');
     } catch (cause) {
       setSyncState(navigator.onLine ? 'error' : 'offline');
       throw cause;

@@ -11,6 +11,7 @@ import {
 import { auth } from './firebase';
 import { db } from './firestore';
 import { emptyData, TABLES, type Data, type Table, type Tables } from '../types';
+import { dueIncomePostings } from '../utils/finance';
 
 const collectionNames: Record<Table, string> = {
   accounts: 'accounts',
@@ -123,6 +124,26 @@ export function subscribeData(
 
 export async function saveRecord<K extends Table>(table: K, record: Tables[K]) {
   await setDoc(userDocument(table, record.id), record);
+}
+
+export async function postDueRecurringIncome(data: Data, today?: string) {
+  const plan = dueIncomePostings(data, today);
+  const writes: Array<{
+    table: 'transactions' | 'recurring_transactions';
+    record: Tables['transactions'] | Tables['recurring_transactions'];
+  }> = [
+    ...plan.transactions.map((record) => ({ table: 'transactions' as const, record })),
+    ...plan.updates.map((record) => ({ table: 'recurring_transactions' as const, record })),
+  ];
+
+  for (let index = 0; index < writes.length; index += 450) {
+    const batch = writeBatch(db);
+    for (const { table, record } of writes.slice(index, index + 450))
+      batch.set(userDocument(table, record.id), record);
+    await batch.commit();
+  }
+
+  return plan.transactions.length;
 }
 
 export async function deleteRecord(table: Table, id: string) {

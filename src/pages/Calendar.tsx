@@ -156,8 +156,8 @@ export function Calendar({ edit }: { edit: (r: EditorRequest) => void }) {
             ))}
           {!entries.some((e) => e.date === selected) && <Empty text="Rien de prévu ce jour-là." />}
           <p className="muted spaced">
-            Les récurrences sont prévisionnelles. Utilisez la coche après le paiement pour
-            enregistrer l’opération réelle sans la compter deux fois.
+            Les revenus récurrents sont ajoutés automatiquement à leur date. Pour les dépenses et
+            les transferts, utilisez la coche après le paiement afin d’éviter les doublons.
           </p>
         </Card>
       </div>

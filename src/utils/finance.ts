@@ -95,6 +95,52 @@ export function occurrences(item: Subscription | Recurring, start: string, end: 
   return result;
 }
 
+export function dueIncomePostings(data: Data, today = iso(), createdAt = new Date().toISOString()) {
+  const existing = new Set(
+    data.transactions.flatMap(
+      (transaction) => [transaction.id, transaction.source_event_id].filter(Boolean) as string[],
+    ),
+  );
+  const transactions: Transaction[] = [];
+  const updates: Recurring[] = [];
+
+  for (const recurring of data.recurring_transactions) {
+    if (!recurring.active || recurring.type !== 'income' || recurring.next_date > today) continue;
+
+    const due = occurrences(recurring, recurring.next_date, today).slice(0, 240);
+    for (const event of due) {
+      if (existing.has(event.id)) continue;
+      transactions.push({
+        id: event.id,
+        created_at: createdAt,
+        amount: event.amount,
+        type: 'income',
+        category_id: recurring.category_id,
+        account_id: recurring.account_id,
+        to_account_id: null,
+        source_event_id: event.id,
+        date: event.date,
+        time: '',
+        description: recurring.name,
+        note: 'Ajout automatique Nivo',
+      });
+      existing.add(event.id);
+    }
+    if (due.length)
+      updates.push({
+        ...recurring,
+        next_date: advance(
+          recurring.next_date,
+          recurring.frequency,
+          recurring.interval_days,
+          due.length,
+        ),
+      });
+  }
+
+  return { transactions, updates };
+}
+
 export function events(data: Data, start: string, end: string): Event[] {
   return [
     ...data.subscriptions.flatMap((s) => occurrences(s, start, end)),

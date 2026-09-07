@@ -105,6 +105,12 @@ npm run build
 
 La page **Réglages** permet d’exporter toutes les collections dans un fichier JSON. Pour restaurer une sauvegarde, sélectionner ce fichier, vérifier le nombre d’éléments affiché, puis confirmer. Le fichier est contrôlé avant tout envoi et les nouvelles données sont écrites avant la suppression des anciens éléments.
 
+## Salaire mensuel automatique
+
+Le bouton d’ajout rapide propose **Mon salaire mensuel**. Après avoir choisi le montant, le compte et la prochaine date de versement, Nivo crée automatiquement le revenu à chaque échéance mensuelle et avance la date suivante. Chaque occurrence possède un identifiant déterministe afin d’empêcher les doublons.
+
+Le traitement s’exécute à l’ouverture de l’application. Si Nivo était fermé le jour du versement, les occurrences manquantes sont ajoutées lors de la prochaine connexion.
+
 ## Architecture d’authentification
 
 ```text

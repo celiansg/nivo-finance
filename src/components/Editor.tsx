@@ -400,10 +400,15 @@ export function Editor({ request, onClose }: { request: EditorRequest; onClose: 
               d’argent entre comptes.
             </p>
           )}
-          {(table === 'subscriptions' || table === 'recurring_transactions') && (
+          {table === 'subscriptions' && (
             <p className="form-hint">
-              Les échéances alimentent les prévisions. Elles ne créent pas de débit réel
-              automatiquement.
+              Les échéances alimentent les prévisions sans créer de débit automatiquement.
+            </p>
+          )}
+          {table === 'recurring_transactions' && (
+            <p className="form-hint">
+              Les revenus sont ajoutés automatiquement à leur date. Les dépenses et transferts
+              restent prévisionnels jusqu’à leur validation dans le calendrier.
             </p>
           )}
           {error && (
@@ -441,26 +446,62 @@ export function QuickAdd({
   onSelect: (r: EditorRequest) => void;
   onClose: () => void;
 }) {
+  const { data } = useFinance();
+  const salaryCategory = data.categories.find((category) => category.id === 'salaire');
+  const actions: Array<{
+    key: string;
+    label: string;
+    icon: string;
+    request: EditorRequest;
+  }> = [
+    {
+      key: 'expense',
+      label: 'Une dépense',
+      icon: 'ArrowUpRight',
+      request: { table: 'transactions', defaults: { type: 'expense' as TransactionType } },
+    },
+    {
+      key: 'income',
+      label: 'Un revenu ponctuel',
+      icon: 'ArrowDownLeft',
+      request: { table: 'transactions', defaults: { type: 'income' as TransactionType } },
+    },
+    {
+      key: 'salary',
+      label: 'Mon salaire mensuel',
+      icon: 'BriefcaseBusiness',
+      request: {
+        table: 'recurring_transactions',
+        defaults: {
+          name: 'Salaire',
+          type: 'income',
+          frequency: 'monthly',
+          next_date: iso(),
+          account_id: data.accounts[0]?.id ?? '',
+          category_id: salaryCategory?.id ?? data.categories[0]?.id ?? '',
+        },
+      },
+    },
+    {
+      key: 'transfer',
+      label: 'Un transfert',
+      icon: 'ArrowLeftRight',
+      request: { table: 'transactions', defaults: { type: 'transfer' as TransactionType } },
+    },
+    {
+      key: 'subscription',
+      label: 'Un abonnement',
+      icon: 'Repeat',
+      request: { table: 'subscriptions' },
+    },
+  ];
   return (
     <Modal title="Que souhaitez-vous ajouter ?" onClose={onClose}>
       <div className="quick-actions">
-        {[
-          ['expense', 'Une dépense', 'ArrowUpRight'],
-          ['income', 'Un revenu', 'ArrowDownLeft'],
-          ['transfer', 'Un transfert', 'ArrowLeftRight'],
-          ['subscription', 'Un abonnement', 'Repeat'],
-        ].map(([type, label, icon]) => (
-          <button
-            key={type}
-            onClick={() =>
-              onSelect({
-                table: type === 'subscription' ? 'subscriptions' : 'transactions',
-                defaults: type === 'subscription' ? {} : { type: type as TransactionType },
-              })
-            }
-          >
-            <Icon name={icon} />
-            <span>{label}</span>
+        {actions.map((action) => (
+          <button key={action.key} onClick={() => onSelect(action.request)}>
+            <Icon name={action.icon} />
+            <span>{action.label}</span>
             <Icon name="ChevronRight" size={17} />
           </button>
         ))}
