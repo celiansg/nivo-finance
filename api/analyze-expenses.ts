@@ -12,7 +12,7 @@ type ResponseLike = {
 type GeminiPart = { text?: string };
 
 const MAX_IMAGE_BYTES = 8_000_000;
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
 function headerValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;

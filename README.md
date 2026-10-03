@@ -124,7 +124,7 @@ GEMINI_API_KEY=votre_cle_Gemini
 FIREBASE_API_KEY=votre_cle_Web_Firebase
 ```
 
-`GEMINI_MODEL` est facultative et vaut `gemini-2.5-flash-lite` par défaut. La clé Gemini ne doit jamais être préfixée par `VITE_`, car les variables `VITE_*` sont intégrées dans le JavaScript public. Les captures bancaires ne sont pas enregistrées par l’application après l’analyse.
+`GEMINI_MODEL` est facultative et vaut `gemini-3.5-flash-lite` par défaut. La clé Gemini ne doit jamais être préfixée par `VITE_`, car les variables `VITE_*` sont intégrées dans le JavaScript public. Les captures bancaires ne sont pas enregistrées par l’application après l’analyse.
 
 ## Architecture d’authentification
 
