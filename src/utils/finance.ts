@@ -238,8 +238,13 @@ export function summary(data: Data, now = new Date()) {
   };
 }
 
-export function history(data: Data, range: string, kind: 'total' | 'savings' = 'total') {
-  const now = new Date();
+export function history(
+  data: Data,
+  range: string,
+  kind: 'total' | 'savings' = 'total',
+  referenceDate = new Date(),
+) {
+  const now = referenceDate;
   const earliest = [
     ...data.transactions.map((t) => t.date),
     ...data.accounts.map((a) => a.created_at.slice(0, 10)),

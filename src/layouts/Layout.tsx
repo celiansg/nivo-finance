@@ -14,6 +14,7 @@ const nav = [
   ['/epargne', 'Épargne', 'PiggyBank'],
   ['/statistiques', 'Statistiques', 'ChartPie'],
   ['/calendrier', 'Calendrier', 'CalendarDays'],
+  ['/assistant', 'Nivo IA', 'Sparkles'],
 ];
 const mobileMore = [
   ['/comptes', 'Comptes', 'Wallet'],
@@ -22,6 +23,7 @@ const mobileMore = [
   ['/epargne', 'Épargne', 'PiggyBank'],
   ['/calendrier', 'Calendrier', 'CalendarDays'],
   ['/reglages', 'Réglages', 'Settings2'],
+  ['/assistant', 'Nivo IA', 'Sparkles'],
 ];
 export function Layout({ children, onAdd }: { children: ReactNode; onAdd: () => void }) {
   const { data, toast, syncState } = useFinance();

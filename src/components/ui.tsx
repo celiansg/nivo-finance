@@ -55,6 +55,7 @@ import {
   ChevronDown,
   Pencil,
   Bell,
+  Eye,
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useRef, type ReactNode } from 'react';
@@ -115,6 +116,7 @@ const icons: Record<string, LucideIcon> = {
   ChevronDown,
   Pencil,
   Bell,
+  Eye,
 };
 export function Icon({
   name = 'Wallet',

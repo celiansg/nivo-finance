@@ -111,6 +111,21 @@ Le bouton d’ajout rapide propose **Mon salaire mensuel**. Après avoir choisi 
 
 Le traitement s’exécute à l’ouverture de l’application. Si Nivo était fermé le jour du versement, les occurrences manquantes sont ajoutées lors de la prochaine connexion.
 
+## Import bancaire avec Nivo IA
+
+La page **Nivo IA** permet d’envoyer une capture d’écran d’un historique bancaire. L’image est préparée dans le navigateur, envoyée à une fonction Vercel protégée par la session Firebase, puis analysée par Gemini. Nivo rapproche les opérations détectées avec celles déjà présentes et les affiche pour validation avant tout enregistrement.
+
+Une capture partielle ne supprime jamais une opération existante. Les opérations déjà présentes sont simplement signalées comme ignorées.
+
+Pour activer l’analyse sur Vercel, ajouter ces variables privées au projet **nivo** :
+
+```text
+GEMINI_API_KEY=votre_cle_Gemini
+FIREBASE_API_KEY=votre_cle_Web_Firebase
+```
+
+`GEMINI_MODEL` est facultative et vaut `gemini-2.5-flash-lite` par défaut. La clé Gemini ne doit jamais être préfixée par `VITE_`, car les variables `VITE_*` sont intégrées dans le JavaScript public. Les captures bancaires ne sont pas enregistrées par l’application après l’analyse.
+
 ## Architecture d’authentification
 
 ```text

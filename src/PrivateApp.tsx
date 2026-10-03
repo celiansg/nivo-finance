@@ -27,6 +27,9 @@ const Analytics = lazy(() =>
 const Calendar = lazy(() =>
   import('./pages/Calendar').then((module) => ({ default: module.Calendar })),
 );
+const AIAssistant = lazy(() =>
+  import('./pages/AIAssistant').then((module) => ({ default: module.AIAssistant })),
+);
 const Settings = lazy(() =>
   import('./pages/Settings').then((module) => ({ default: module.Settings })),
 );
@@ -75,6 +78,7 @@ function PrivateApplication() {
             <Route path="/epargne" element={<Savings edit={edit} />} />
             <Route path="/statistiques" element={<Analytics />} />
             <Route path="/calendrier" element={<Calendar edit={edit} />} />
+            <Route path="/assistant" element={<AIAssistant />} />
             <Route path="/reglages" element={<Settings edit={edit} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

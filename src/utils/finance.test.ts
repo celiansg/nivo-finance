@@ -69,7 +69,7 @@ describe('Transferts et soldes', () => {
     expect(accountBalance(recent, [], '2026-09-03')).toBe(1000);
     const d = emptyData();
     d.accounts = [recent];
-    expect(history(d, '7j')[0].value).toBe(0);
+    expect(history(d, '7j', 'total', new Date(2026, 8, 5))[0].value).toBe(0);
   });
   it('annule l’effet d’une opération supprimée et remplace celui d’une opération modifiée', () => {
     expect(accountBalance(account, [])).toBe(1000);
