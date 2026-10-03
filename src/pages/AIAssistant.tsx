@@ -165,7 +165,16 @@ export function AIAssistant() {
       const payload = (await response.json()) as AnalysisResult & { error?: string };
       if (!response.ok) throw new Error(payload.error || 'Analyse impossible.');
       const extracted = Array.isArray(payload.transactions) ? payload.transactions : [];
-      const rows = extracted.map((row) => {
+      const uniqueExtracted = extracted.filter(
+        (row, index) =>
+          extracted.findIndex(
+            (candidate) =>
+              candidate.date === row.date &&
+              Math.abs(candidate.amount - row.amount) <= 0.01 &&
+              normalize(candidate.description) === normalize(row.description),
+          ) === index,
+      );
+      const rows = uniqueExtracted.map((row) => {
         const category = findCategory(row.category, data.categories);
         const duplicate = data.transactions.some((existing) => sameTransaction(row, existing));
         return {
@@ -176,7 +185,7 @@ export function AIAssistant() {
         };
       });
       setAnalysis({
-        transactions: extracted,
+        transactions: uniqueExtracted,
         summary:
           payload.summary ||
           `${rows.length} opération${rows.length > 1 ? 's' : ''} détectée${rows.length > 1 ? 's' : ''}.`,
