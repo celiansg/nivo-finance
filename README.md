@@ -1,6 +1,6 @@
 # Nivo Finance
 
-Application web privée de gestion financière personnelle. React, Vite, TypeScript, Firebase Authentication et Cloud Firestore. Ce n’est pas une PWA : elle s’utilise directement dans un navigateur.
+Application web privée de gestion financière personnelle. React, Vite, TypeScript, Firebase Authentication et Cloud Firestore. Nivo est aussi une PWA installable depuis un navigateur mobile ou un ordinateur.
 
 ## Démarrer
 
@@ -84,6 +84,14 @@ npx firebase-tools deploy --only firestore:rules --project finances-f5c06
 Le `#` est nécessaire pour conserver un routage fiable sur GitHub Pages. La route React reste `/login`.
 
 Firebase Authentication gère entièrement le mot de passe. Le code ne l’enregistre ni dans Firestore, ni dans une variable d’environnement, ni dans `localStorage`. Le navigateur peut néanmoins proposer son propre gestionnaire de mots de passe, indépendamment de l’application.
+
+## Installer Nivo comme une application
+
+Le manifeste `public/manifest.webmanifest`, les icônes Nivo et `public/sw.js` rendent l’application installable. Le service worker met en cache l’interface et les assets afin que la coquille de l’application puisse s’ouvrir sans réseau ; les données Firebase et les opérations d’écriture nécessitent toujours une connexion pour rester synchronisées.
+
+- Sur iPhone/iPad : ouvrir Nivo dans Safari, toucher **Partager**, puis **Sur l’écran d’accueil**.
+- Sur Android : ouvrir Nivo dans Chrome, ouvrir le menu, puis choisir **Installer l’application** ou **Ajouter à l’écran d’accueil**.
+- Sur ordinateur : utiliser l’icône d’installation dans la barre d’adresse de Chrome ou Edge.
 
 ## Publier sur GitHub Pages
 
