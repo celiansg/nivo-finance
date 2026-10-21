@@ -19,7 +19,8 @@ const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 25;
 const TOKEN_TIMEOUT_MS = 8_000;
 const GEMINI_TIMEOUT_MS = 45_000;
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+const MODEL_FALLBACKS = ['gemini-3.5-flash-lite', 'gemini-2.5-flash'];
 const requestCounters = new Map<string, { count: number; resetAt: number }>();
 
 function headerValue(value: string | string[] | undefined) {
@@ -147,40 +148,53 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
     if (!geminiKey)
       return res.status(503).json({ error: 'Le moteur conversationnel n’est pas configuré dans Vercel.' });
 
-    const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-goog-api-key': geminiKey,
-        },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: `${SYSTEM_INSTRUCTION}\n\n<nivo_context>${context}</nivo_context>` }],
-          },
-          contents: messages.map((message) => ({
-            role: message.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: message.text }],
-          })),
-          generationConfig: {
-            temperature: 0.35,
-            maxOutputTokens: 900,
-          },
-        }),
+    const requestBody = JSON.stringify({
+      systemInstruction: {
+        parts: [{ text: `${SYSTEM_INSTRUCTION}\n\n<nivo_context>${context}</nivo_context>` }],
       },
-      GEMINI_TIMEOUT_MS,
-    );
-    const result = (await response.json()) as {
+      contents: messages.map((message) => ({
+        role: message.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: message.text }],
+      })),
+      generationConfig: {
+        temperature: 0.35,
+        maxOutputTokens: 900,
+      },
+    });
+    let response: Response | undefined;
+    let result: {
       error?: { message?: string };
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    if (!response.ok) {
+    } | undefined;
+    let usedModel = MODEL;
+    const models = [...new Set([MODEL, ...MODEL_FALLBACKS])];
+    for (const model of models) {
+      usedModel = model;
+      response = await fetchWithTimeout(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-goog-api-key': geminiKey,
+          },
+          body: requestBody,
+        },
+        GEMINI_TIMEOUT_MS,
+      );
+      result = (await response.json()) as {
+        error?: { message?: string };
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+      if (response.ok || ![400, 404].includes(response.status)) break;
+    }
+    if (!response || !result || !response.ok) {
       console.error(
         JSON.stringify({
           event: 'nivo_chat_provider_error',
-          status: response.status,
-          providerMessage: result.error?.message?.slice(0, 240) || 'unknown',
+          status: response?.status,
+          attemptedModels: models,
+          providerMessage: result?.error?.message?.slice(0, 240) || 'unknown',
         }),
       );
       return res.status(502).json({ error: 'Le moteur conversationnel a refusé la demande.' });
@@ -190,7 +204,7 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
     return res.status(200).json({
       text: text.slice(0, 6_000),
       mode: 'ai',
-      sources: ['Données Nivo autorisées', `Gemini · ${MODEL}`],
+      sources: ['Données Nivo autorisées', `Gemini · ${usedModel}`],
     });
   } catch (cause) {
     console.error(
