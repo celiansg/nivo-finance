@@ -3905,6 +3905,7 @@ h3,
   --auth-lavender: #eee7ff;
   --auth-border: #ded6ec;
   min-height: 100svh;
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 0.92fr) minmax(420px, 1.08fr);
   align-items: stretch;
