@@ -72,6 +72,39 @@ npx firebase-tools login
 npx firebase-tools deploy --only firestore:rules --project finances-f5c06
 ```
 
+## Checklist de mise en ligne
+
+Les vérifications opérationnelles suivantes sont intégrées au projet :
+
+- **Requêtes et affichage** : les collections sont écoutées une seule fois par session avec `onSnapshot`. La page
+  Transactions trie et affiche les résultats par tranches de 25 afin d’éviter une longue liste à l’écran. Les champs
+  et montants sont validés avant chaque écriture.
+- **Appels IA** : l’endpoint `/api/analyze-expenses` exige un jeton Firebase, limite les appels à 10 par fenêtre de
+  10 minutes et par adresse source sur une instance Vercel, refuse les images trop lourdes, impose un délai maximal
+  et limite la réponse à 100 opérations. La clé Gemini reste uniquement côté serveur.
+- **États d’attente et d’échec** : les boutons d’envoi sont désactivés pendant une écriture ou une analyse, les
+  erreurs Firebase/API sont affichées avec une action Réessayer, et les erreurs React non récupérées présentent un
+  écran de reprise.
+- **Doublons et paiements** : Nivo ne déclenche aucun paiement externe ; il enregistre uniquement des opérations.
+  Les écritures sont désactivées pendant leur traitement, les occurrences récurrentes utilisent un identifiant
+  déterministe et les imports refusent les lignes déjà présentes.
+- **Mémoire et fichiers** : les aperçus d’images libèrent leurs `ObjectURL`, les images bancaires sont redimensionnées
+  et compressées dans le navigateur, les captures sont limitées à 8 Mo et les sauvegardes JSON à 10 Mo.
+- **Sauvegardes** : une copie JSON automatique est téléchargée avant chaque restauration ; l’import est validé avant
+  toute écriture et les données existantes sont remplacées seulement après confirmation.
+- **Index Firestore** : les requêtes actuelles portent sur une collection utilisateur sans filtre composé ; Firestore
+  crée donc les index simples automatiquement. Aucun index composite artificiel n’est ajouté tant qu’une requête ne le
+  nécessite pas.
+- **En-têtes et cache** : Vercel applique `nosniff`, une politique de référent stricte, l’interdiction d’iframe, une
+  politique de permissions minimale, HSTS, le cache immutable des assets versionnés et `no-store` pour l’API.
+- **Surveillance** : `.github/workflows/uptime.yml` vérifie les URLs Vercel et GitHub Pages toutes les 15 minutes.
+  Les erreurs serveur et client sont structurées dans les logs Vercel sans enregistrer de capture bancaire ni de mot de
+  passe.
+
+La limite IA en mémoire protège chaque instance Vercel et absorbe les doubles clics ou abus courants. Pour une limite
+globale stricte entre plusieurs instances, activez aussi les protections anti-abus/App Check Firebase et une règle WAF
+ou un stockage de compteur partagé sur Vercel.
+
 ## Fonctionnement de la session
 
 `AuthContext` observe Firebase avec `onAuthStateChanged` dès le lancement. Firebase conserve la session, puis l’application restaure automatiquement l’utilisateur après une actualisation.

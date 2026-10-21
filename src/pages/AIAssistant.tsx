@@ -93,6 +93,8 @@ function amountLabel(amount: number, direction: 'expense' | 'income', currency: 
   return direction === 'expense' ? `−${formatted}` : `+${formatted}`;
 }
 
+const ANALYSIS_TIMEOUT_MS = 50_000;
+
 export function AIAssistant() {
   const { user } = useAuth();
   const { data, save, money, notify } = useFinance();
@@ -108,6 +110,12 @@ export function AIAssistant() {
   useEffect(() => {
     if (!accountId && data.accounts[0]) setAccountId(data.accounts[0].id);
   }, [accountId, data.accounts]);
+
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
 
   const selectedCount = reviewRows.filter((row) => row.selected && !row.duplicate).length;
   const currency = data.settings[0]?.currency ?? 'EUR';
@@ -154,6 +162,8 @@ export function AIAssistant() {
     }
     setBusy(true);
     setError('');
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), ANALYSIS_TIMEOUT_MS);
     try {
       const prepared = await resizeImage(file);
       const token = await user.getIdToken();
@@ -161,8 +171,11 @@ export function AIAssistant() {
         method: 'POST',
         headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(prepared),
+        signal: controller.signal,
       });
-      const payload = (await response.json()) as AnalysisResult & { error?: string };
+      const payload = (await response.json().catch(() => ({}))) as AnalysisResult & {
+        error?: string;
+      };
       if (!response.ok) throw new Error(payload.error || 'Analyse impossible.');
       const extracted = Array.isArray(payload.transactions) ? payload.transactions : [];
       const uniqueExtracted = extracted.filter(
@@ -194,8 +207,15 @@ export function AIAssistant() {
       setReviewRows(rows);
       if (!rows.length) setError('Aucune opération lisible n’a été détectée sur cette image.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Analyse impossible pour le moment.');
+      setError(
+        cause instanceof DOMException && cause.name === 'AbortError'
+          ? 'L’analyse prend trop de temps. Réessayez avec une capture plus légère.'
+          : cause instanceof Error
+            ? cause.message
+            : 'Analyse impossible pour le moment.',
+      );
     } finally {
+      window.clearTimeout(timeout);
       setBusy(false);
     }
   }

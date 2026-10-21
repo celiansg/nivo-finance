@@ -1,0 +1,24 @@
+name: Monitor Nivo availability
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  healthcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check production URLs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for url in \
+            "https://nivo-pi.vercel.app/" \
+            "https://celiansg.github.io/nivo-finance/"; do
+            echo "Checking ${url}"
+            body="$(curl --fail --silent --show-error --location --max-time 20 "${url}")"
+            grep -q "Nivo Finance" <<<"${body}"
+          done

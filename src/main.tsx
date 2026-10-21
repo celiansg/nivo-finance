@@ -1,15 +1,27 @@
 import { createRoot } from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
+import { reportClientError } from './utils/errorReporting';
 import App from './App';
 import './styles.css';
 
+window.addEventListener('error', (event) => {
+  reportClientError({ source: 'window-error', message: event.message, stack: event.error?.stack });
+});
+window.addEventListener('unhandledrejection', (event) => {
+  const reason = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
+  reportClientError({ source: 'unhandled-rejection', message: reason.message, stack: reason.stack });
+});
+
 createRoot(document.getElementById('root')!).render(
-  <HashRouter>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
-  </HashRouter>,
+  <AppErrorBoundary>
+    <HashRouter>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </HashRouter>
+  </AppErrorBoundary>,
 );
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

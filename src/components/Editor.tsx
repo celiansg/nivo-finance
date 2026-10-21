@@ -337,7 +337,7 @@ export function Editor({ request, onClose }: { request: EditorRequest; onClose: 
             {table === 'savings_goals' ? ' et ses allocations' : ''} ?
           </p>
           <div className="form-actions">
-            <button className="button" onClick={() => setConfirmDelete(false)}>
+            <button className="button" disabled={busy} onClick={() => setConfirmDelete(false)}>
               Annuler
             </button>
             <button className="button danger" disabled={busy} onClick={destroy}>
@@ -422,6 +422,7 @@ export function Editor({ request, onClose }: { request: EditorRequest; onClose: 
                 type="button"
                 className="icon-button danger-text"
                 aria-label="Supprimer"
+                disabled={busy}
                 onClick={() => setConfirmDelete(true)}
               >
                 <Icon name="Trash2" />

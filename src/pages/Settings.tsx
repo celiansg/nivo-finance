@@ -7,6 +7,9 @@ import type { Settings as SettingsType } from '../types';
 import type { Data } from '../types';
 import { backupCount, parseFinanceBackup } from '../utils/backup';
 import { period } from '../utils/finance';
+
+const MAX_BACKUP_BYTES = 10_000_000;
+
 export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
   const { data, save, restore, notify } = useFinance();
   const { user, logout } = useAuth();
@@ -49,12 +52,12 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
       setBusy(false);
     }
   }
-  function exportData() {
+  function downloadBackup(source: Data, prefix: string) {
     const url = URL.createObjectURL(
       new Blob(
         [
           JSON.stringify(
-            { version: 1, exported_at: new Date().toISOString(), mode: 'personal', data },
+            { version: 1, exported_at: new Date().toISOString(), mode: 'personal', data: source },
             null,
             2,
           ),
@@ -64,9 +67,13 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
     );
     const a = document.createElement('a');
     a.href = url;
-    a.download = `nivo-personnel-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `${prefix}-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportData() {
+    downloadBackup(data, 'nivo-personnel');
     notify('Export téléchargé');
   }
   async function selectBackup(event: ChangeEvent<HTMLInputElement>) {
@@ -74,6 +81,12 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
     event.target.value = '';
     if (!file) return;
     setError('');
+    if (file.size > MAX_BACKUP_BYTES) {
+      setBackup(null);
+      setBackupName('');
+      setError('Cette sauvegarde dépasse 10 Mo. Choisissez un fichier plus léger.');
+      return;
+    }
     try {
       setBackup(parseFinanceBackup(await file.text()));
       setBackupName(file.name);
@@ -88,6 +101,7 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
     setImportBusy(true);
     setError('');
     try {
+      downloadBackup(data, 'nivo-avant-restauration');
       await restore(backup);
       setBackup(null);
       setBackupName('');
