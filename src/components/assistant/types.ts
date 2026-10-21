@@ -8,6 +8,7 @@ export type ConversationMessage = {
   text: string;
   sources?: string[];
   insightKind?: InsightKind;
+  mode?: 'ai' | 'local';
 };
 
 export type AssistantMoney = (amount: number) => string;

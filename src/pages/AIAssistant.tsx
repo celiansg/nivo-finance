@@ -4,8 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useFinance } from '../hooks/useFinance';
 import { Card, Icon, SectionTitle } from '../components/ui';
 import { NivoMark } from '../components/BrandLogo';
-import type { Category, TransactionType } from '../types';
-import { answerFinancialQuestion, buildFinancialInsights, type AssistantAnswer } from '../utils/insights';
+import type { Category, Data, TransactionType } from '../types';
+import { answerFinancialQuestion, buildFinancialInsights } from '../utils/insights';
 import { ChatComposer } from '../components/assistant/ChatComposer';
 import { ConversationThread } from '../components/assistant/ConversationThread';
 import { SuggestionChips, type Suggestion } from '../components/assistant/SuggestionChips';
@@ -100,6 +100,7 @@ function amountLabel(amount: number, direction: 'expense' | 'income', currency: 
 }
 
 const ANALYSIS_TIMEOUT_MS = 50_000;
+const CHAT_TIMEOUT_MS = 45_000;
 
 const assistantSuggestions: Suggestion[] = [
   { label: 'Où va mon argent ce mois-ci ?', detail: 'Voir les principales catégories', icon: 'ChartNoAxesCombined' },
@@ -114,6 +115,110 @@ function insightKindForQuestion(value: string): InsightKind | undefined {
   if (question.includes('depense') || question.includes('augmente') || question.includes('argent')) return 'spending';
   if (question.includes('epargn') || question.includes('econom') || question.includes('objectif') || question.includes('achat')) return 'goal';
   return 'overview';
+}
+
+function buildAssistantContext(data: Data) {
+  const insights = buildFinancialInsights(data);
+  const categoryName = (categoryId: string | null) =>
+    data.categories.find((category) => category.id === categoryId)?.name ?? 'Sans catégorie';
+  const accountName = (accountId: string) =>
+    data.accounts.find((account) => account.id === accountId)?.name ?? 'Compte inconnu';
+  const recentTransactions = [...data.transactions]
+    .sort((a, b) => `${b.date}T${b.time}`.localeCompare(`${a.date}T${a.time}`))
+    .slice(0, 45)
+    .map((transaction) => ({
+      date: transaction.date,
+      description: transaction.description.slice(0, 100),
+      amount: transaction.amount,
+      type: transaction.type,
+      category: categoryName(transaction.category_id),
+      account: accountName(transaction.account_id),
+    }));
+  return {
+    today: insights.today,
+    currency: data.settings[0]?.currency ?? 'EUR',
+    summary: {
+      incomeThisMonth: insights.income,
+      expectedMonthlyIncome: insights.incomeExpected,
+      fixedExpenses: insights.fixedExpenses,
+      variableExpenses: insights.variableExpenses,
+      plannedSavings: insights.plannedSavings,
+      disposable: insights.disposableKnown ? insights.disposable : null,
+      knownSubscriptionsMonthly: insights.knownSubscriptionsMonthly,
+      knownSubscriptionsAnnual: insights.knownSubscriptionsAnnual,
+      subscriptionCandidates: insights.candidates.map((candidate) => ({
+        name: candidate.name,
+        monthlyAmount: candidate.monthlyAmount,
+        occurrences: candidate.occurrences,
+        confidence: candidate.confidence,
+      })),
+      categorySpending: insights.categorySpending.slice(0, 8),
+    },
+    accounts: data.accounts.map((account) => ({
+      name: account.name,
+      type: account.type,
+      balance: account.balance,
+    })),
+    subscriptions: data.subscriptions.filter((subscription) => subscription.active).map((subscription) => ({
+      name: subscription.name,
+      amount: subscription.amount,
+      frequency: subscription.frequency,
+      nextDate: subscription.next_date,
+    })),
+    recurringIncomeAndExpenses: data.recurring_transactions.filter((item) => item.active).map((item) => ({
+      name: item.name,
+      amount: item.amount,
+      type: item.type,
+      frequency: item.frequency,
+      nextDate: item.next_date,
+    })),
+    goals: insights.goals.map((goal) => ({
+      name: goal.name,
+      target: goal.amount,
+      saved: goal.saved,
+      remaining: goal.remaining,
+      targetDate: goal.target_date,
+      monthlyRequired: goal.monthlyRequired,
+    })),
+    recentTransactions,
+  };
+}
+
+type AssistantChatResponse = { text: string; sources: string[]; mode: 'ai' | 'local' };
+
+async function requestAssistantChat({
+  token,
+  messages,
+  context,
+  signal,
+}: {
+  token: string;
+  messages: Array<{ role: 'user' | 'assistant'; text: string }>;
+  context: ReturnType<typeof buildAssistantContext>;
+  signal: AbortSignal;
+}): Promise<AssistantChatResponse> {
+  const response = await fetch('/api/assistant-chat', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ messages, context }),
+    signal,
+  });
+  const payload = (await response.json().catch(() => ({}))) as {
+    text?: unknown;
+    sources?: unknown;
+    mode?: unknown;
+    error?: unknown;
+  };
+  if (!response.ok || typeof payload.text !== 'string' || !payload.text.trim()) {
+    throw new Error(typeof payload.error === 'string' ? payload.error : 'Le moteur conversationnel ne répond pas.');
+  }
+  return {
+    text: payload.text.trim(),
+    mode: payload.mode === 'ai' ? 'ai' : 'local',
+    sources: Array.isArray(payload.sources)
+      ? payload.sources.filter((source): source is string => typeof source === 'string').slice(0, 5)
+      : [],
+  };
 }
 
 export function AIAssistant() {
@@ -132,7 +237,7 @@ export function AIAssistant() {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [thinking, setThinking] = useState(false);
-  const pendingAnswer = useRef<number | null>(null);
+  const requestController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!accountId && data.accounts[0]) setAccountId(data.accounts[0].id);
@@ -144,9 +249,7 @@ export function AIAssistant() {
     };
   }, [preview]);
 
-  useEffect(() => () => {
-    if (pendingAnswer.current !== null) window.clearTimeout(pendingAnswer.current);
-  }, []);
+  useEffect(() => () => requestController.current?.abort(), []);
 
   const selectedCount = reviewRows.filter((row) => row.selected && !row.duplicate).length;
   const currency = data.settings[0]?.currency ?? 'EUR';
@@ -161,18 +264,58 @@ export function AIAssistant() {
     [reviewRows],
   );
 
-  function askAssistant(value = question) {
+  async function askAssistant(value = question) {
     const trimmed = value.trim();
     if (!trimmed || thinking) return;
-    const answer: AssistantAnswer = answerFinancialQuestion(trimmed, data);
-    setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'user', text: trimmed }]);
+    const localAnswer = answerFinancialQuestion(trimmed, data);
+    const userMessage: ConversationMessage = { id: crypto.randomUUID(), role: 'user', text: trimmed };
+    const history = [...messages, userMessage].map(({ role, text }) => ({ role, text }));
+    const controller = new AbortController();
+    requestController.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+    setMessages((current) => [...current, userMessage]);
     setQuestion('');
     setThinking(true);
-    pendingAnswer.current = window.setTimeout(() => {
-      setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', text: answer.text, sources: answer.sources, insightKind: insightKindForQuestion(trimmed) }]);
+    try {
+      const token = user ? await user.getIdToken() : '';
+      if (!token) throw new Error('Session Firebase indisponible.');
+      const remoteAnswer = await requestAssistantChat({
+        token,
+        messages: history,
+        context: buildAssistantContext(data),
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          text: remoteAnswer.text,
+          sources: remoteAnswer.sources,
+          mode: remoteAnswer.mode,
+          insightKind: insightKindForQuestion(trimmed),
+        },
+      ]);
+    } catch (cause) {
+      if (controller.signal.aborted) return;
+      const reason = cause instanceof Error ? cause.message : 'service indisponible';
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          text: `Je ne peux pas joindre le moteur conversationnel pour le moment (${reason}). Voici le calcul disponible avec vos données Nivo :\n\n${localAnswer.text}`,
+          sources: [...localAnswer.sources, 'Calcul local de secours'],
+          mode: 'local',
+          insightKind: insightKindForQuestion(trimmed),
+        },
+      ]);
+    } finally {
+      window.clearTimeout(timeout);
+      if (requestController.current === controller) requestController.current = null;
       setThinking(false);
-      pendingAnswer.current = null;
-    }, 260);
+    }
   }
 
   function startNewDiscussion() {
@@ -346,7 +489,7 @@ export function AIAssistant() {
     <div className="assistant-page">
       <header className="assistant-header">
         <div className="assistant-header-brand"><span className="assistant-header-mark"><NivoMark size={24} /></span><div><span className="eyebrow">NIVO IA</span><h1>Assistant Nivo</h1><p>Comprendre vos finances, prendre de meilleures décisions.</p></div></div>
-        <div className="assistant-header-actions"><span className="assistant-mode-label"><Icon name="ShieldCheck" size={14} /> Analyses à partir de vos opérations Nivo</span><button className="button" type="button" onClick={startNewDiscussion} disabled={thinking}><Icon name="Plus" size={16} /> Nouvelle discussion</button></div>
+        <div className="assistant-header-actions"><span className="assistant-mode-label"><Icon name="ShieldCheck" size={14} /> Chatbot privé · données Nivo</span><button className="button" type="button" onClick={startNewDiscussion} disabled={thinking}><Icon name="Plus" size={16} /> Nouvelle discussion</button></div>
       </header>
       <div className="assistant-mode-switch" role="tablist" aria-label="Fonctionnalités de Nivo IA">
         <button role="tab" aria-selected={mode === 'chat'} className={mode === 'chat' ? 'active' : ''} onClick={() => setMode('chat')}><Icon name="Sparkles" size={16} /> Conversation</button>
@@ -354,7 +497,7 @@ export function AIAssistant() {
       </div>
       {mode === 'chat' && (
         <section className={`assistant-workspace ${messages.length ? 'has-messages' : 'is-empty'}`} aria-label="Conversation avec Nivo">
-          {!messages.length ? <div className="assistant-empty-state"><span className="assistant-empty-orb"><NivoMark size={30} /></span><h2>Bonjour 👋<br />Comment puis-je vous aider aujourd’hui&nbsp;?</h2><p>Posez une question sur vos dépenses, vos abonnements ou vos objectifs. Les calculs restent liés à vos données Nivo.</p><SuggestionChips suggestions={assistantSuggestions} onSelect={askAssistant} /></div> : <ConversationThread messages={messages} insights={buildFinancialInsights(data)} money={money} currency={currency} />}
+          {!messages.length ? <div className="assistant-empty-state"><span className="assistant-empty-orb"><NivoMark size={30} /></span><h2>Bonjour 👋<br />Comment puis-je vous aider aujourd’hui&nbsp;?</h2><p>Parlez naturellement à Nivo : dépenses, abonnements, budget, projets ou épargne. Les chiffres viennent de vos données privées.</p><SuggestionChips suggestions={assistantSuggestions} onSelect={askAssistant} /></div> : <ConversationThread messages={messages} insights={buildFinancialInsights(data)} money={money} currency={currency} />}
           {messages.length > 0 && thinking && <div className="assistant-thinking" role="status"><span className="assistant-message-avatar"><Icon name="Sparkles" size={14} /></span><span>Nivo analyse vos opérations <i /><i /><i /></span></div>}
           <div className="assistant-composer-dock"><ChatComposer value={question} onChange={setQuestion} onSubmit={() => askAssistant()} onAttach={attachFromComposer} disabled={thinking} thinking={thinking} attachmentName={file?.name} /></div>
         </section>
