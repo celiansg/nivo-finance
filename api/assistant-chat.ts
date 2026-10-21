@@ -19,7 +19,7 @@ const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 25;
 const TOKEN_TIMEOUT_MS = 8_000;
 const GEMINI_TIMEOUT_MS = 45_000;
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+const MODEL = process.env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash-lite';
 const MODEL_FALLBACKS = ['gemini-3.5-flash-lite', 'gemini-2.5-flash'];
 const requestCounters = new Map<string, { count: number; resetAt: number }>();
 
@@ -109,6 +109,16 @@ function contextText(value: unknown) {
   return text.length > 20_000 ? `${text.slice(0, 20_000)}…` : text;
 }
 
+function providerError(status: number | undefined) {
+  if (status === 401 || status === 403)
+    return 'La clé Gemini est refusée. Vérifiez GEMINI_API_KEY dans les variables Production de Vercel.';
+  if (status === 429)
+    return 'Le quota Gemini est temporairement atteint. Réessayez dans quelques instants.';
+  if (status === 400 || status === 404)
+    return 'Le modèle Gemini configuré n’est pas disponible. Supprimez GEMINI_MODEL dans Vercel ou utilisez gemini-3.5-flash-lite, puis redéployez.';
+  return 'Le service Gemini est momentanément indisponible. Réessayez dans quelques instants.';
+}
+
 const SYSTEM_INSTRUCTION = `
 Tu es Nivo, un assistant conversationnel financier francophone intégré à une application privée de finances personnelles.
 
@@ -186,7 +196,7 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
         error?: { message?: string };
         candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
       };
-      if (response.ok || ![400, 404].includes(response.status)) break;
+      if (response.ok || ![400, 403, 404].includes(response.status)) break;
     }
     if (!response || !result || !response.ok) {
       console.error(
@@ -197,7 +207,7 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
           providerMessage: result?.error?.message?.slice(0, 240) || 'unknown',
         }),
       );
-      return res.status(502).json({ error: 'Le moteur conversationnel a refusé la demande.' });
+      return res.status(502).json({ error: providerError(response?.status) });
     }
     const text = result.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('').trim();
     if (!text) return res.status(502).json({ error: 'Le moteur conversationnel n’a pas répondu.' });
