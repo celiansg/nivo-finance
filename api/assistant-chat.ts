@@ -156,17 +156,13 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
           'x-goog-api-key': geminiKey,
         },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: `<nivo_context>${context}</nivo_context>` }],
-            },
-            ...messages.map((message) => ({
-              role: message.role === 'assistant' ? 'model' : 'user',
-              parts: [{ text: message.text }],
-            })),
-          ],
+          systemInstruction: {
+            parts: [{ text: `${SYSTEM_INSTRUCTION}\n\n<nivo_context>${context}</nivo_context>` }],
+          },
+          contents: messages.map((message) => ({
+            role: message.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: message.text }],
+          })),
           generationConfig: {
             temperature: 0.35,
             maxOutputTokens: 900,
