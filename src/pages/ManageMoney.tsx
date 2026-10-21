@@ -100,7 +100,7 @@ export function ManageMoney({ edit }: { edit: (request: EditorRequest) => void }
               <p>Que se passe-t-il si vous mettez de côté chaque mois :</p>
               <label className="manage-scenario-input"><input type="number" min="0" step="1" value={scenarioAmount} onChange={(event) => setScenarioAmount(event.target.value)} /><span>{currency} / mois</span></label>
               <div className={`manage-scenario-result ${scenario.feasible ? 'is-feasible' : 'is-not-feasible'}`}>
-                <span><Icon name={scenario.feasible ? 'CircleCheck' : 'Bell'} size={16} /> {scenario.feasible ? 'Scénario soutenable' : 'À ajuster'}</span>
+                <span aria-hidden="true"><Icon name={scenario.feasible ? 'CircleCheck' : 'Bell'} size={16} /></span>
                 <b>{money(scenario.annualImpact)} / an</b>
               </div>
               <small className="form-hint">Reste estimé après épargne : {insights.disposableKnown ? money(scenario.remainingDisposable) : 'données insuffisantes'}.</small>
@@ -126,6 +126,11 @@ export function ManageMoney({ edit }: { edit: (request: EditorRequest) => void }
         <Card>
           <SectionTitle title="Détections depuis vos transactions"><span className="data-source-chip"><Icon name="ShieldCheck" size={14} /> Données Nivo</span></SectionTitle>
           <p className="manage-section-intro">Nivo repère des montants similaires à intervalles réguliers. Rien n’est créé sans votre confirmation.</p>
+          <div className="manage-detection-how">
+            <div><span>1</span><strong>Enregistrez ou importez vos opérations</strong><small>Une capture bancaire peut être analysée depuis cette page.</small></div>
+            <div><span>2</span><strong>Nivo compare les récurrences</strong><small>Libellé, montant et intervalle sur les 12 derniers mois.</small></div>
+            <div><span>3</span><strong>Vous confirmez l’abonnement</strong><small>Aucune écriture n’est créée automatiquement.</small></div>
+          </div>
           <div className="manage-subscription-summary"><span><b>{money(insights.knownSubscriptionsMonthly)}</b><small>déjà confirmé / mois</small></span><span><b>{money(insights.knownSubscriptionsAnnual)}</b><small>équivalent annuel</small></span><Link className="button" to="/abonnements">Gérer mes abonnements</Link></div>
           {candidates.map((candidate) => <CandidateRow key={candidate.id} candidate={candidate} money={money} onConfirm={() => void confirmCandidate(candidate)} onIgnore={() => setIgnored((current) => [...current, candidate.id])} saving={savingCandidate === candidate.id} />)}
           {!candidates.length && <Empty text="Aucune détection en attente. Nivo a besoin de plusieurs opérations comparables." />}
