@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Icon } from '../components/ui';
-import { NivoLogo, NivoMark } from '../components/BrandLogo';
+import { NivoLogo } from '../components/BrandLogo';
 
 function friendlyError(cause: unknown) {
   const code =
@@ -108,9 +108,6 @@ export function Login() {
           <br />
           Rien qu’à vous.
         </p>
-        <div className="auth-orbit">
-          <NivoMark size={124} />
-        </div>
       </div>
       <main className="auth-form">
         <div>
