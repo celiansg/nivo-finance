@@ -65,7 +65,7 @@ export function Layout({ children, onAdd }: { children: ReactNode; onAdd: () => 
               <Icon name="ChevronDown" size={15} />
             </summary>
             <div className="sidebar-more-links">
-              {[...secondaryNav, ['/assistant', 'Assistant', 'Sparkles']].map(([path, label, icon]) => (
+              {secondaryNav.map(([path, label, icon]) => (
                 <NavLink key={path} to={path} end>
                   <Icon name={icon} />
                   {label}
@@ -151,7 +151,7 @@ export function Layout({ children, onAdd }: { children: ReactNode; onAdd: () => 
               </button>
             </div>
             <div className="mobile-more-grid">
-              {secondaryNav.map(([path, label, icon]) => (
+              {[...secondaryNav, ['/assistant', 'Assistant', 'Sparkles']].map(([path, label, icon]) => (
                 <NavLink key={path} to={path}>
                   <Icon name={icon} />
                   <span>{label}</span>
