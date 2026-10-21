@@ -30,8 +30,11 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     const serviceWorkerUrl = new URL(`${baseUrl}sw.js`, window.location.href);
     const scope = new URL(baseUrl, window.location.href).pathname;
 
-    navigator.serviceWorker.register(serviceWorkerUrl, { scope }).catch(() => {
-      // A service worker is an enhancement. The app remains fully usable when it cannot register.
-    });
+    navigator.serviceWorker
+      .register(serviceWorkerUrl, { scope, updateViaCache: 'none' })
+      .then((registration) => registration.update())
+      .catch(() => {
+        // A service worker is an enhancement. The app remains fully usable when it cannot register.
+      });
   });
 }
