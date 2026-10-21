@@ -101,7 +101,7 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
     <>
       <div className="page-heading">
         <div>
-          <h1>À votre image</h1>
+          <h1>Réglages</h1>
           <p>Les petits réglages qui font la différence.</p>
         </div>
       </div>
@@ -142,10 +142,6 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
                     </option>
                   ))}
                 </select>
-              </label>
-              <label className="field">
-                <span>Langue</span>
-                <input value="Français" readOnly />
               </label>
             </div>
             <p className="form-hint">

@@ -93,6 +93,9 @@ export function Layout({ children, onAdd }: { children: ReactNode; onAdd: () => 
             <NivoLogo markSize={31} />
           </span>
           <div className="mobile-header-actions">
+            <span className={`mobile-sync-status ${syncState}`} role="status" aria-label={syncLabel}>
+              <i />
+            </span>
             <button
               type="button"
               className={moreOpen ? 'active' : ''}

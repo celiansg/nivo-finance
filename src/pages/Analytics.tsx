@@ -33,7 +33,7 @@ export function Analytics() {
     <>
       <div className="page-heading">
         <div>
-          <h1>Vos finances, en perspective</h1>
+          <h1>Statistiques</h1>
           <p>Comprendre vos habitudes pour mieux choisir.</p>
         </div>
       </div>

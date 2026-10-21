@@ -4078,6 +4078,31 @@ body {
   font-size: 13px !important;
 }
 
+.mobile-sync-status {
+  display: grid;
+  width: 12px;
+  height: 12px;
+  place-items: center;
+}
+.mobile-sync-status i {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #51b399;
+  box-shadow: 0 0 0 3px rgba(81, 179, 153, 0.14);
+}
+.mobile-sync-status.connecting i {
+  background: #f0a43b;
+  box-shadow: 0 0 0 3px rgba(240, 164, 59, 0.14);
+  animation: sync-pulse 1.4s ease-in-out infinite;
+}
+.mobile-sync-status.offline i,
+.mobile-sync-status.error i {
+  background: #d76565;
+  box-shadow: 0 0 0 3px rgba(215, 101, 101, 0.14);
+}
+
 @media (max-width: 900px) and (min-width: 768px) {
   .sidebar-more > summary {
     justify-content: center;

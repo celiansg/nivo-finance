@@ -19,7 +19,7 @@ export function Calendar({ edit }: { edit: (r: EditorRequest) => void }) {
     <>
       <div className="page-heading">
         <div>
-          <h1>Un temps d’avance</h1>
+          <h1>Calendrier</h1>
           <p>Vos échéances et votre fin de mois, en un regard.</p>
         </div>
         <button

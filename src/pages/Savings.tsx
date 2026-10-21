@@ -13,7 +13,7 @@ export function Savings({ edit }: { edit: (r: EditorRequest) => void }) {
     <>
       <div className="page-heading">
         <div>
-          <h1>Épargne & projets</h1>
+          <h1>Objectifs d’épargne</h1>
           <p>Donnez une direction à votre argent.</p>
         </div>
         <button className="button primary" onClick={() => edit({ table: 'savings_goals' })}>
