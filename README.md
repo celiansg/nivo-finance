@@ -11,16 +11,16 @@ npm run dev
 
 La configuration publique de l’application Firebase `finances-f5c06` se trouve dans `src/services/firebase.ts`. Aucun e-mail, identifiant de connexion ou mot de passe n’est présent dans le projet.
 
-## Créer l’unique utilisateur
+## Activer les comptes privés
 
 Dans la [console Firebase](https://console.firebase.google.com/project/finances-f5c06) :
 
 1. Ouvrir **Build → Authentication → Commencer**.
 2. Activer le fournisseur **Adresse e-mail/Mot de passe**.
-3. Ouvrir l’onglet **Users**, cliquer sur **Add user**, puis créer manuellement votre utilisateur.
-4. Ne pas communiquer ce mot de passe et ne l’ajouter à aucun fichier du projet.
+3. Ouvrir l’onglet **Users**, puis ajouter manuellement un utilisateur si vous voulez conserver un compte déjà créé.
+4. Ne pas communiquer un mot de passe et ne l’ajouter à aucun fichier du projet.
 
-L’application ne contient aucune page d’inscription et n’appelle jamais `createUserWithEmailAndPassword`. Elle propose uniquement la connexion, la réinitialisation du mot de passe et la déconnexion.
+La page `/login` propose maintenant la connexion et la création d’un compte. Une création réussie envoie un e-mail de vérification, puis déconnecte immédiatement le nouvel utilisateur jusqu’à ce qu’il confirme son adresse. Le mot de passe est transmis directement à Firebase Authentication et n’est jamais écrit par Nivo.
 
 Dans **Authentication → Settings → Authorized domains**, ajouter `127.0.0.1` pour le développement local et `VOTRE_COMPTE.github.io` pour GitHub Pages.
 
@@ -137,7 +137,7 @@ FIREBASE_API_KEY=votre_cle_Web_Firebase
 ## Architecture d’authentification
 
 ```text
-src/contexts/AuthContext.tsx     # user, loading, login, logout, resetPassword
+src/contexts/AuthContext.tsx     # user, loading, login, createAccount, logout, resetPassword
 src/components/ProtectedRoute.tsx
 src/pages/Login.tsx
 src/services/firebase.ts         # initialisation Firebase
@@ -147,6 +147,4 @@ firestore.rules                  # isolation par UID
 
 La clé API Firebase Web est publique par conception : elle identifie le projet mais n’accorde aucun accès aux documents. La protection effective repose sur Firebase Authentication et les règles Firestore publiées.
 
-## Limite importante
-
-Masquer la page d’inscription empêche l’inscription depuis l’interface, mais le fournisseur Firebase e-mail/mot de passe expose techniquement une API de création de comptes. Même si un tiers créait un autre compte par cette API, les règles par UID l’empêcheraient d’accéder à vos données. Pour interdire également toute création externe de compte, il faut ajouter ultérieurement une règle d’admission côté serveur, par exemple une fonction Firebase Authentication bloquante ou un contrôle par custom claim.
+Chaque compte Firebase possède un UID différent. Les règles Firestore refusent toute lecture ou écriture si ce UID ne correspond pas au chemin `users/{uid}` ; un autre utilisateur ne peut donc pas consulter vos comptes, transactions ou réglages. Pour réduire les abus d’inscription, vous pouvez aussi activer les protections anti-abus Firebase et App Check depuis la console.

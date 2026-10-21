@@ -1394,6 +1394,12 @@ main {
   line-height: 1.6;
   margin: 18px 0;
 }
+.success-text {
+  color: #278765;
+}
+.error-text {
+  color: #b7465e;
+}
 .error {
   padding: 14px 17px;
   color: #a93248;
@@ -1842,8 +1848,28 @@ main {
   font-size: 12px;
   margin-top: -10px;
 }
+.password-hint {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: -9px 0 -8px;
+}
 .login-button {
   width: 100%;
+}
+.auth-switch {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 18px 0 0;
+  text-align: center;
+}
+.text-button {
+  color: var(--blue);
+  font-weight: 650;
+}
+.text-button:disabled {
+  opacity: 0.55;
 }
 .auth-security {
   display: flex;

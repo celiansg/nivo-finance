@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   browserLocalPersistence,
+  createUserWithEmailAndPassword,
   onAuthStateChanged,
+  sendEmailVerification,
   sendPasswordResetEmail,
   setPersistence,
   signInWithEmailAndPassword,
@@ -14,6 +16,7 @@ type AuthContextValue = {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  createAccount: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
 };
@@ -40,6 +43,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login: async (email, password) => {
         await setPersistence(auth, browserLocalPersistence);
         await signInWithEmailAndPassword(auth, email.trim(), password);
+      },
+      createAccount: async (email, password) => {
+        await setPersistence(auth, browserLocalPersistence);
+        const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        try {
+          await sendEmailVerification(credential.user);
+        } finally {
+          // A newly created account must not enter the private app before the email step completes.
+          await signOut(auth);
+        }
       },
       logout: () => signOut(auth),
       resetPassword: (email) => sendPasswordResetEmail(auth, email.trim()),
