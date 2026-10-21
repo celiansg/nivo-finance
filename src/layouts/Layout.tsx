@@ -8,15 +8,16 @@ import { NivoLogo } from '../components/BrandLogo';
 const primaryNav = [
   ['/', 'Accueil', 'LayoutDashboard'],
   ['/transactions', 'Transactions', 'ArrowLeftRight'],
-  ['/comptes', 'Comptes', 'Wallet'],
-  ['/budget', 'Budget', 'ChartNoAxesCombined'],
-  ['/statistiques', 'Statistiques', 'ChartPie'],
+  ['/gerer-mon-argent', 'Gérer mon argent', 'ChartNoAxesCombined'],
+  ['/assistant', 'Assistant', 'Sparkles'],
 ];
 const secondaryNav = [
+  ['/comptes', 'Comptes', 'Wallet'],
+  ['/budget', 'Budget', 'ChartNoAxesCombined'],
   ['/abonnements', 'Abonnements', 'Repeat'],
   ['/epargne', 'Épargne', 'PiggyBank'],
+  ['/statistiques', 'Statistiques', 'ChartPie'],
   ['/calendrier', 'Calendrier', 'CalendarDays'],
-  ['/assistant', 'Assistant', 'Sparkles'],
   ['/reglages', 'Réglages', 'Settings2'],
 ];
 const allNav = [...primaryNav, ...secondaryNav];
@@ -34,7 +35,8 @@ export function Layout({ children, onAdd }: { children: ReactNode; onAdd: () => 
     window.addEventListener('keydown', close);
     return () => window.removeEventListener('keydown', close);
   }, [moreOpen]);
-  const moreActive = secondaryNav.some(([path]) => path === location.pathname);
+  const moreActive =
+    secondaryNav.some(([path]) => path === location.pathname) || location.pathname === '/assistant';
   const syncLabel = {
     connecting: 'Synchronisation…',
     synced: 'Données à jour',
@@ -63,7 +65,7 @@ export function Layout({ children, onAdd }: { children: ReactNode; onAdd: () => 
               <Icon name="ChevronDown" size={15} />
             </summary>
             <div className="sidebar-more-links">
-              {secondaryNav.map(([path, label, icon]) => (
+              {[...secondaryNav, ['/assistant', 'Assistant', 'Sparkles']].map(([path, label, icon]) => (
                 <NavLink key={path} to={path} end>
                   <Icon name={icon} />
                   {label}
@@ -93,6 +95,9 @@ export function Layout({ children, onAdd }: { children: ReactNode; onAdd: () => 
             <NivoLogo markSize={31} />
           </span>
           <div className="mobile-header-actions">
+            <button type="button" className="mobile-add-header" aria-label="Ajouter une opération" onClick={onAdd}>
+              <Icon name="Plus" size={17} />
+            </button>
             <span className={`mobile-sync-status ${syncState}`} role="status" aria-label={syncLabel}>
               <i />
             </span>
@@ -167,12 +172,13 @@ export function Layout({ children, onAdd }: { children: ReactNode; onAdd: () => 
           <Icon name="ArrowLeftRight" />
           <span>Opérations</span>
         </NavLink>
-        <button className="add-mobile" onClick={onAdd} aria-label="Ajout rapide">
-          <Icon name="Plus" size={26} />
-        </button>
-        <NavLink to="/statistiques">
+        <NavLink to="/gerer-mon-argent">
           <Icon name="ChartNoAxesCombined" />
-          <span>Stats</span>
+          <span>Gérer</span>
+        </NavLink>
+        <NavLink to="/assistant">
+          <Icon name="Sparkles" />
+          <span>Assistant</span>
         </NavLink>
         <button
           className={moreActive || moreOpen ? 'active' : ''}

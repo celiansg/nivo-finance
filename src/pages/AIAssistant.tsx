@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useFinance } from '../hooks/useFinance';
 import { Card, Icon, SectionTitle } from '../components/ui';
 import type { Category, TransactionType } from '../types';
+import { answerFinancialQuestion, type AssistantAnswer } from '../utils/insights';
 
 type ExtractedTransaction = {
   date: string;
@@ -25,6 +26,8 @@ type AnalysisResult = {
   summary: string;
   warnings: string[];
 };
+
+type ChatMessage = { id: string; role: 'user' | 'assistant'; text: string; sources?: string[] };
 
 const normalize = (value: string) =>
   value
@@ -106,6 +109,11 @@ export function AIAssistant() {
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [mode, setMode] = useState<'chat' | 'import'>('chat');
+  const [question, setQuestion] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { id: 'welcome', role: 'assistant', text: 'Bonjour. Je peux vous aider à comprendre vos dépenses, vos abonnements et vos objectifs à partir des données déjà présentes dans Nivo.' },
+  ]);
 
   useEffect(() => {
     if (!accountId && data.accounts[0]) setAccountId(data.accounts[0].id);
@@ -129,6 +137,18 @@ export function AIAssistant() {
         ),
     [reviewRows],
   );
+
+  function askAssistant(value = question) {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const answer: AssistantAnswer = answerFinancialQuestion(trimmed, data);
+    setMessages((current) => [
+      ...current,
+      { id: crypto.randomUUID(), role: 'user', text: trimmed },
+      { id: crypto.randomUUID(), role: 'assistant', text: answer.text, sources: answer.sources },
+    ]);
+    setQuestion('');
+  }
 
   function chooseFile(next: File | undefined) {
     if (!next) return;
@@ -293,10 +313,28 @@ export function AIAssistant() {
           <span className="eyebrow">
             <Icon name="Sparkles" size={15} /> NIVO IA
           </span>
-          <h1>Import intelligent</h1>
-          <p>Transformez une capture bancaire en opérations prêtes à vérifier.</p>
+          <h1>Votre assistant financier</h1>
+          <p>Des réponses calculées sur vos données, avec validation avant toute modification.</p>
         </div>
       </div>
+      <div className="ai-mode-switch" role="tablist" aria-label="Fonctionnalités de Nivo IA">
+        <button role="tab" aria-selected={mode === 'chat'} className={mode === 'chat' ? 'active' : ''} onClick={() => setMode('chat')}><Icon name="Sparkles" size={16} /> Poser une question</button>
+        <button role="tab" aria-selected={mode === 'import'} className={mode === 'import' ? 'active' : ''} onClick={() => setMode('import')}><Icon name="Upload" size={16} /> Analyser une capture</button>
+      </div>
+      {mode === 'chat' && (
+        <Card className="ai-chat-card">
+          <div className="ai-chat-intro"><span className="ai-chat-avatar"><Icon name="Sparkles" size={18} /></span><div><strong>Une question sur votre argent ?</strong><small>Les réponses sont calculées localement à partir de vos opérations Nivo.</small></div></div>
+          <div className="ai-chat-suggestions">
+            {['Comment économiser 100 € par mois ?', 'Quelles dépenses ont augmenté ?', 'Quels abonnements vérifier ?'].map((suggestion) => <button key={suggestion} onClick={() => askAssistant(suggestion)}>{suggestion}</button>)}
+          </div>
+          <div className="ai-chat-messages" aria-live="polite">
+            {messages.map((message) => <div className={`ai-chat-message ${message.role}`} key={message.id}><span>{message.text}</span>{message.sources && <small>Sources : {message.sources.join(' · ')}</small>}</div>)}
+          </div>
+          <form className="ai-chat-composer" onSubmit={(event) => { event.preventDefault(); askAssistant(); }}><input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ex. Comment réduire mes dépenses ce mois-ci ?" aria-label="Votre question" /><button className="button primary" type="submit" disabled={!question.trim()}><Icon name="ArrowRight" size={17} /> Envoyer</button></form>
+          <p className="form-hint ai-chat-disclaimer"><Icon name="ShieldCheck" size={14} /> Aucune opération n’est modifiée depuis cette conversation.</p>
+        </Card>
+      )}
+      {mode === 'import' && <>
       <div className="ai-import-grid">
         <Card className="ai-upload-card">
           <SectionTitle title="1. Ajoutez une capture" />
@@ -452,6 +490,7 @@ export function AIAssistant() {
           </div>
         </Card>
       )}
+      </>}
     </>
   );
 }
