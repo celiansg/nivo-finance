@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { APP_NAME } from '../types';
-import { GlassLayers, Icon } from '../components/ui';
+import { Icon } from '../components/ui';
 import { NivoLogo, NivoMark } from '../components/BrandLogo';
 
 function friendlyError(cause: unknown) {
@@ -24,6 +23,7 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [messageTone, setMessageTone] = useState<'error' | 'success'>('error');
@@ -32,6 +32,7 @@ export function Login() {
     setMode(nextMode);
     setPassword('');
     setConfirmPassword('');
+    setShowPassword(false);
     setMessage('');
   }
 
@@ -111,11 +112,10 @@ export function Login() {
           <NivoMark size={124} />
         </div>
       </div>
-      <main className="auth-form glass-surface">
-        <GlassLayers />
+      <main className="auth-form">
         <div>
-          <p className="eyebrow">ESPACE PRIVÉ · {APP_NAME.toUpperCase()}</p>
-          <h1>{mode === 'login' ? 'Heureux de vous retrouver.' : 'Créez votre espace privé.'}</h1>
+          <p className="eyebrow">ESPACE PRIVÉ</p>
+          <h1>{mode === 'login' ? 'Bon retour sur Nivo.' : 'Créez votre espace privé.'}</h1>
           <p className="muted spaced">
             {mode === 'login'
               ? 'Connectez-vous pour retrouver vos finances.'
@@ -135,13 +135,25 @@ export function Login() {
             </label>
             <label className="field">
               <span>Mot de passe</span>
-              <input
-                type="password"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                required
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
+              <span className="password-field">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  disabled={busy}
+                >
+                  <Icon name={showPassword ? 'EyeOff' : 'Eye'} size={18} />
+                </button>
+              </span>
             </label>
             {mode === 'signup' && (
               <>
@@ -150,13 +162,15 @@ export function Login() {
                 </p>
                 <label className="field">
                   <span>Confirmer le mot de passe</span>
-                  <input
-                    type="password"
-                    autoComplete="new-password"
-                    required
-                    value={confirmPassword}
-                    onChange={(event) => setConfirmPassword(event.target.value)}
-                  />
+                  <span className="password-field">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      required
+                      value={confirmPassword}
+                      onChange={(event) => setConfirmPassword(event.target.value)}
+                    />
+                  </span>
                 </label>
               </>
             )}
@@ -201,7 +215,7 @@ export function Login() {
             </button>
           </p>
           <p className="auth-security">
-            <Icon name="LockKeyhole" size={14} /> Vos données restent isolées par votre compte Firebase.
+            <Icon name="LockKeyhole" size={14} /> Connexion protégée par Firebase Authentication.
           </p>
         </div>
       </main>
