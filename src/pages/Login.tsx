@@ -121,21 +121,27 @@ export function Login() {
           <form onSubmit={submit}>
             <label className="field">
               <span>Adresse e-mail</span>
-              <input
-                type="email"
-                inputMode="email"
-                autoComplete={mode === 'login' ? 'username' : 'email'}
-                required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
+              <span className="input-with-icon">
+                <Icon name="Mail" size={19} />
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoComplete={mode === 'login' ? 'username' : 'email'}
+                  placeholder="vous@exemple.fr"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              </span>
             </label>
             <label className="field">
               <span>Mot de passe</span>
-              <span className="password-field">
+              <span className="password-field input-with-icon">
+                <Icon name="LockKeyhole" size={19} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  placeholder="Votre mot de passe"
                   required
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
@@ -159,10 +165,12 @@ export function Login() {
                 </p>
                 <label className="field">
                   <span>Confirmer le mot de passe</span>
-                  <span className="password-field">
+                  <span className="password-field input-with-icon">
+                    <Icon name="LockKeyhole" size={19} />
                     <input
                       type={showPassword ? 'text' : 'password'}
                       autoComplete="new-password"
+                      placeholder="Confirmez votre mot de passe"
                       required
                       value={confirmPassword}
                       onChange={(event) => setConfirmPassword(event.target.value)}
@@ -200,6 +208,9 @@ export function Login() {
               {!busy && <Icon name="ArrowRight" size={17} />}
             </button>
           </form>
+          <div className="auth-divider" aria-hidden="true">
+            <span>ou</span>
+          </div>
           <p className="auth-switch">
             {mode === 'login' ? 'Vous n’avez pas encore de compte ?' : 'Vous avez déjà un compte ?'}{' '}
             <button

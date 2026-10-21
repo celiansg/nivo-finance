@@ -4108,6 +4108,22 @@ h3,
   position: relative;
   display: block;
 }
+.input-with-icon {
+  position: relative;
+  display: block;
+}
+.input-with-icon > svg {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 16px;
+  color: #81779f;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+.auth-form .input-with-icon input {
+  padding-left: 50px;
+}
 .password-field input {
   padding-right: 52px !important;
 }
@@ -4195,8 +4211,24 @@ h3,
   outline: 3px solid rgba(118, 49, 231, 0.25);
   outline-offset: 3px;
 }
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 24px;
+  color: #877d9d;
+  font-size: 13px;
+  line-height: 1;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: #e5deef;
+}
 .auth-switch {
-  margin: 22px 0 0;
+  margin: 16px 0 0;
   color: var(--auth-muted);
   font-size: 13px;
   line-height: 1.5;

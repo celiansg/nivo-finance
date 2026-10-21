@@ -55,6 +55,7 @@ import {
   ChevronDown,
   Pencil,
   Bell,
+  Mail,
   Eye,
   EyeOff,
   type LucideIcon,
@@ -117,6 +118,7 @@ const icons: Record<string, LucideIcon> = {
   ChevronDown,
   Pencil,
   Bell,
+  Mail,
   Eye,
   EyeOff,
 };
