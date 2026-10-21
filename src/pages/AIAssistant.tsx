@@ -1,10 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useFinance } from '../hooks/useFinance';
 import { Card, Icon, SectionTitle } from '../components/ui';
+import { NivoMark } from '../components/BrandLogo';
 import type { Category, TransactionType } from '../types';
-import { answerFinancialQuestion, type AssistantAnswer } from '../utils/insights';
+import { answerFinancialQuestion, buildFinancialInsights, type AssistantAnswer } from '../utils/insights';
+import { ChatComposer } from '../components/assistant/ChatComposer';
+import { ConversationThread } from '../components/assistant/ConversationThread';
+import { SuggestionChips, type Suggestion } from '../components/assistant/SuggestionChips';
+import type { ConversationMessage, InsightKind } from '../components/assistant/types';
 
 type ExtractedTransaction = {
   date: string;
@@ -26,8 +31,6 @@ type AnalysisResult = {
   summary: string;
   warnings: string[];
 };
-
-type ChatMessage = { id: string; role: 'user' | 'assistant'; text: string; sources?: string[] };
 
 const normalize = (value: string) =>
   value
@@ -98,6 +101,21 @@ function amountLabel(amount: number, direction: 'expense' | 'income', currency: 
 
 const ANALYSIS_TIMEOUT_MS = 50_000;
 
+const assistantSuggestions: Suggestion[] = [
+  { label: 'Où va mon argent ce mois-ci ?', detail: 'Voir les principales catégories', icon: 'ChartNoAxesCombined' },
+  { label: 'Quels abonnements vérifier ?', detail: 'Repérer les récurrences', icon: 'Repeat' },
+  { label: 'Comment épargner 100 € par mois ?', detail: 'Tester un scénario', icon: 'PiggyBank' },
+  { label: 'Comparer mes dépenses avec le mois dernier', detail: 'Mesurer les évolutions', icon: 'ArrowLeftRight' },
+];
+
+function insightKindForQuestion(value: string): InsightKind | undefined {
+  const question = normalize(value);
+  if (question.includes('abonnement') || question.includes('prelevement') || question.includes('recurr')) return 'subscriptions';
+  if (question.includes('depense') || question.includes('augmente') || question.includes('argent')) return 'spending';
+  if (question.includes('epargn') || question.includes('econom') || question.includes('objectif') || question.includes('achat')) return 'goal';
+  return 'overview';
+}
+
 export function AIAssistant() {
   const { user } = useAuth();
   const { data, save, money, notify } = useFinance();
@@ -112,9 +130,9 @@ export function AIAssistant() {
   const [error, setError] = useState('');
   const [mode, setMode] = useState<'chat' | 'import'>(() => searchParams.get('mode') === 'import' ? 'import' : 'chat');
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'welcome', role: 'assistant', text: 'Bonjour. Je peux vous aider à comprendre vos dépenses, vos abonnements et vos objectifs à partir des données déjà présentes dans Nivo.' },
-  ]);
+  const [messages, setMessages] = useState<ConversationMessage[]>([]);
+  const [thinking, setThinking] = useState(false);
+  const pendingAnswer = useRef<number | null>(null);
 
   useEffect(() => {
     if (!accountId && data.accounts[0]) setAccountId(data.accounts[0].id);
@@ -125,6 +143,10 @@ export function AIAssistant() {
       if (preview) URL.revokeObjectURL(preview);
     };
   }, [preview]);
+
+  useEffect(() => () => {
+    if (pendingAnswer.current !== null) window.clearTimeout(pendingAnswer.current);
+  }, []);
 
   const selectedCount = reviewRows.filter((row) => row.selected && !row.duplicate).length;
   const currency = data.settings[0]?.currency ?? 'EUR';
@@ -141,14 +163,27 @@ export function AIAssistant() {
 
   function askAssistant(value = question) {
     const trimmed = value.trim();
-    if (!trimmed) return;
+    if (!trimmed || thinking) return;
     const answer: AssistantAnswer = answerFinancialQuestion(trimmed, data);
-    setMessages((current) => [
-      ...current,
-      { id: crypto.randomUUID(), role: 'user', text: trimmed },
-      { id: crypto.randomUUID(), role: 'assistant', text: answer.text, sources: answer.sources },
-    ]);
+    setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'user', text: trimmed }]);
     setQuestion('');
+    setThinking(true);
+    pendingAnswer.current = window.setTimeout(() => {
+      setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', text: answer.text, sources: answer.sources, insightKind: insightKindForQuestion(trimmed) }]);
+      setThinking(false);
+      pendingAnswer.current = null;
+    }, 260);
+  }
+
+  function startNewDiscussion() {
+    if (thinking) return;
+    setMessages([]);
+    setQuestion('');
+  }
+
+  function attachFromComposer(next: File) {
+    chooseFile(next);
+    setMode('import');
   }
 
   function chooseFile(next: File | undefined) {
@@ -308,32 +343,21 @@ export function AIAssistant() {
   }
 
   return (
-    <>
-      <div className="page-heading">
-        <div>
-          <span className="eyebrow">
-            <Icon name="Sparkles" size={15} /> NIVO IA
-          </span>
-          <h1>Votre assistant financier</h1>
-          <p>Des réponses calculées sur vos données, avec validation avant toute modification.</p>
-        </div>
-      </div>
-      <div className="ai-mode-switch" role="tablist" aria-label="Fonctionnalités de Nivo IA">
-        <button role="tab" aria-selected={mode === 'chat'} className={mode === 'chat' ? 'active' : ''} onClick={() => setMode('chat')}><Icon name="Sparkles" size={16} /> Poser une question</button>
-        <button role="tab" aria-selected={mode === 'import'} className={mode === 'import' ? 'active' : ''} onClick={() => setMode('import')}><Icon name="Upload" size={16} /> Analyser une capture</button>
+    <div className="assistant-page">
+      <header className="assistant-header">
+        <div className="assistant-header-brand"><span className="assistant-header-mark"><NivoMark size={24} /></span><div><span className="eyebrow">NIVO IA</span><h1>Assistant Nivo</h1><p>Comprendre vos finances, prendre de meilleures décisions.</p></div></div>
+        <div className="assistant-header-actions"><span className="assistant-mode-label"><Icon name="ShieldCheck" size={14} /> Analyses à partir de vos opérations Nivo</span><button className="button" type="button" onClick={startNewDiscussion} disabled={thinking}><Icon name="Plus" size={16} /> Nouvelle discussion</button></div>
+      </header>
+      <div className="assistant-mode-switch" role="tablist" aria-label="Fonctionnalités de Nivo IA">
+        <button role="tab" aria-selected={mode === 'chat'} className={mode === 'chat' ? 'active' : ''} onClick={() => setMode('chat')}><Icon name="Sparkles" size={16} /> Conversation</button>
+        <button role="tab" aria-selected={mode === 'import'} className={mode === 'import' ? 'active' : ''} onClick={() => setMode('import')}><Icon name="Upload" size={16} /> Importer une capture</button>
       </div>
       {mode === 'chat' && (
-        <Card className="ai-chat-card">
-          <div className="ai-chat-intro"><span className="ai-chat-avatar"><Icon name="Sparkles" size={18} /></span><div><strong>Une question sur votre argent ?</strong><small>Les réponses sont calculées localement à partir de vos opérations Nivo.</small></div></div>
-          <div className="ai-chat-suggestions">
-            {['Comment économiser 100 € par mois ?', 'Quelles dépenses ont augmenté ?', 'Quels abonnements vérifier ?'].map((suggestion) => <button key={suggestion} onClick={() => askAssistant(suggestion)}>{suggestion}</button>)}
-          </div>
-          <div className="ai-chat-messages" aria-live="polite">
-            {messages.map((message) => <div className={`ai-chat-message ${message.role}`} key={message.id}><span>{message.text}</span>{message.sources && <small>Sources : {message.sources.join(' · ')}</small>}</div>)}
-          </div>
-          <form className="ai-chat-composer" onSubmit={(event) => { event.preventDefault(); askAssistant(); }}><input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ex. Comment réduire mes dépenses ce mois-ci ?" aria-label="Votre question" /><button className="button primary" type="submit" disabled={!question.trim()}><Icon name="ArrowRight" size={17} /> Envoyer</button></form>
-          <p className="form-hint ai-chat-disclaimer"><Icon name="ShieldCheck" size={14} /> Aucune opération n’est modifiée depuis cette conversation.</p>
-        </Card>
+        <section className={`assistant-workspace ${messages.length ? 'has-messages' : 'is-empty'}`} aria-label="Conversation avec Nivo">
+          {!messages.length ? <div className="assistant-empty-state"><span className="assistant-empty-orb"><NivoMark size={30} /></span><h2>Bonjour 👋<br />Comment puis-je vous aider aujourd’hui&nbsp;?</h2><p>Posez une question sur vos dépenses, vos abonnements ou vos objectifs. Les calculs restent liés à vos données Nivo.</p><SuggestionChips suggestions={assistantSuggestions} onSelect={askAssistant} /></div> : <ConversationThread messages={messages} insights={buildFinancialInsights(data)} money={money} currency={currency} />}
+          {messages.length > 0 && thinking && <div className="assistant-thinking" role="status"><span className="assistant-message-avatar"><Icon name="Sparkles" size={14} /></span><span>Nivo analyse vos opérations <i /><i /><i /></span></div>}
+          <div className="assistant-composer-dock"><ChatComposer value={question} onChange={setQuestion} onSubmit={() => askAssistant()} onAttach={attachFromComposer} disabled={thinking} thinking={thinking} attachmentName={file?.name} /></div>
+        </section>
       )}
       {mode === 'import' && <>
       <div className="ai-import-grid">
@@ -492,6 +516,6 @@ export function AIAssistant() {
         </Card>
       )}
       </>}
-    </>
+    </div>
   );
 }
