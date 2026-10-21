@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useFinance } from '../hooks/useFinance';
 import { Card, Icon } from '../components/ui';
 import { TransactionList } from '../components/TransactionList';
@@ -55,6 +56,14 @@ export function Transactions({ edit }: { edit: (r: EditorRequest) => void }) {
           Nouvelle transaction
         </button>
       </div>
+      <Card className="transactions-ai-cta">
+        <span className="transactions-ai-icon"><Icon name="Sparkles" size={20} /></span>
+        <div>
+          <strong>Importer un relevé avec Nivo IA</strong>
+          <p>Envoyez une capture de votre banque : les opérations seront lues, dédoublonnées et proposées à vérifier avant l’ajout.</p>
+        </div>
+        <Link className="button primary" to="/assistant?mode=import"><Icon name="ArrowRight" size={16} /> Analyser une capture</Link>
+      </Card>
       <Card>
         <div className="filters">
           <div className="filter-primary">

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useFinance } from '../hooks/useFinance';
 import { Card, Icon, SectionTitle } from '../components/ui';
@@ -101,6 +101,7 @@ const ANALYSIS_TIMEOUT_MS = 50_000;
 export function AIAssistant() {
   const { user } = useAuth();
   const { data, save, money, notify } = useFinance();
+  const [searchParams] = useSearchParams();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState('');
   const [accountId, setAccountId] = useState(data.accounts[0]?.id ?? '');
@@ -109,7 +110,7 @@ export function AIAssistant() {
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [mode, setMode] = useState<'chat' | 'import'>('chat');
+  const [mode, setMode] = useState<'chat' | 'import'>(() => searchParams.get('mode') === 'import' ? 'import' : 'chat');
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'welcome', role: 'assistant', text: 'Bonjour. Je peux vous aider à comprendre vos dépenses, vos abonnements et vos objectifs à partir des données déjà présentes dans Nivo.' },

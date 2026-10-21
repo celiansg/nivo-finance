@@ -5043,3 +5043,14 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .ai-mode-switch button, .ai-chat-suggestions button { transition: none; }
 }
+
+.transactions-ai-cta { display: flex; align-items: center; gap: 13px; margin: -7px 0 18px; padding: 15px 17px; border: 1px solid rgba(124,58,237,.16); background: linear-gradient(110deg, rgba(245,239,255,.78), rgba(255,255,255,.58)); }
+.transactions-ai-icon { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border-radius: 13px; color: #fff; background: linear-gradient(145deg,#7c3aed,#b36df6); }
+.transactions-ai-cta > div { min-width: 0; flex: 1; }
+.transactions-ai-cta strong { display: block; font-size: 14px; }
+.transactions-ai-cta p { margin: 3px 0 0; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.transactions-ai-cta .button { flex: 0 0 auto; white-space: nowrap; }
+@media (max-width: 560px) {
+  .transactions-ai-cta { align-items: flex-start; flex-wrap: wrap; }
+  .transactions-ai-cta .button { width: 100%; margin-left: 53px; }
+}
