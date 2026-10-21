@@ -92,7 +92,8 @@ function readMessages(value: unknown): ChatMessage[] {
   let messages = value
     .slice(-MAX_HISTORY_ITEMS)
     .map((message) => {
-      const row = message && typeof message === 'object' ? (message as Record<string, unknown>) : {};
+      const row =
+        message && typeof message === 'object' ? (message as Record<string, unknown>) : {};
       const role = row.role === 'assistant' ? 'assistant' : row.role === 'user' ? 'user' : null;
       const text = cleanText(row.text);
       return role && text ? { role, text } : null;
@@ -156,7 +157,9 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
     const context = contextText(payload.context);
     const geminiKey = process.env.GEMINI_API_KEY;
     if (!geminiKey)
-      return res.status(503).json({ error: 'Le moteur conversationnel n’est pas configuré dans Vercel.' });
+      return res
+        .status(503)
+        .json({ error: 'Le moteur conversationnel n’est pas configuré dans Vercel.' });
 
     const requestBody = JSON.stringify({
       systemInstruction: {
@@ -172,10 +175,12 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
       },
     });
     let response: Response | undefined;
-    let result: {
-      error?: { message?: string };
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    } | undefined;
+    let result:
+      | {
+          error?: { message?: string };
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+        }
+      | undefined;
     let usedModel = MODEL;
     const models = [...new Set([MODEL, ...MODEL_FALLBACKS])];
     for (const model of models) {
@@ -209,7 +214,10 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
       );
       return res.status(502).json({ error: providerError(response?.status) });
     }
-    const text = result.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('').trim();
+    const text = result.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text ?? '')
+      .join('')
+      .trim();
     if (!text) return res.status(502).json({ error: 'Le moteur conversationnel n’a pas répondu.' });
     return res.status(200).json({
       text: text.slice(0, 6_000),
@@ -223,6 +231,8 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
         error: cause instanceof Error ? cause.message.slice(0, 240) : 'unknown',
       }),
     );
-    return res.status(500).json({ error: 'Le moteur conversationnel est momentanément indisponible.' });
+    return res
+      .status(500)
+      .json({ error: 'Le moteur conversationnel est momentanément indisponible.' });
   }
 }

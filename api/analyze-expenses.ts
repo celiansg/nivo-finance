@@ -18,7 +18,8 @@ const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 10;
 const TOKEN_TIMEOUT_MS = 8_000;
 const GEMINI_TIMEOUT_MS = 45_000;
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+const MODEL = process.env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash-lite';
+const MODEL_FALLBACKS = ['gemini-3.5-flash-lite', 'gemini-2.5-flash'];
 const requestCounters = new Map<string, { count: number; resetAt: number }>();
 
 function headerValue(value: string | string[] | undefined) {
@@ -73,6 +74,16 @@ function cleanJson(text: string) {
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/, '')
     .trim();
+}
+
+function providerError(status: number | undefined) {
+  if (status === 401 || status === 403)
+    return 'La clé Gemini est refusée. Vérifiez GEMINI_API_KEY dans les variables Production de Vercel.';
+  if (status === 429)
+    return 'Le quota Gemini est temporairement atteint. Réessayez dans quelques instants.';
+  if (status === 400 || status === 404)
+    return 'Le modèle Gemini configuré n’est pas disponible. Supprimez GEMINI_MODEL dans Vercel ou utilisez gemini-3.5-flash-lite, puis redéployez.';
+  return 'Le service Gemini est momentanément indisponible. Réessayez dans quelques instants.';
 }
 
 async function verifyFirebaseToken(token: string) {
@@ -156,72 +167,83 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
         .status(503)
         .json({ error: 'L’analyse IA n’est pas encore configurée dans Vercel.' });
 
-    const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent?key=${encodeURIComponent(geminiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { inline_data: { mime_type: mimeType, data: image } },
-                { text: promptForToday() },
-              ],
-            },
+    const requestBody = JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { inline_data: { mime_type: mimeType, data: image } },
+            { text: promptForToday() },
           ],
-          generationConfig: {
-            temperature: 0.1,
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: 'OBJECT',
-              properties: {
-                transactions: {
-                  type: 'ARRAY',
-                  items: {
-                    type: 'OBJECT',
-                    properties: {
-                      date: { type: 'STRING' },
-                      description: { type: 'STRING' },
-                      amount: { type: 'NUMBER' },
-                      direction: { type: 'STRING', enum: ['expense', 'income'] },
-                      category: { type: 'STRING' },
-                      confidence: { type: 'NUMBER' },
-                    },
-                    required: [
-                      'date',
-                      'description',
-                      'amount',
-                      'direction',
-                      'category',
-                      'confidence',
-                    ],
-                  },
+        },
+      ],
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'OBJECT',
+          properties: {
+            transactions: {
+              type: 'ARRAY',
+              items: {
+                type: 'OBJECT',
+                properties: {
+                  date: { type: 'STRING' },
+                  description: { type: 'STRING' },
+                  amount: { type: 'NUMBER' },
+                  direction: { type: 'STRING', enum: ['expense', 'income'] },
+                  category: { type: 'STRING' },
+                  confidence: { type: 'NUMBER' },
                 },
-                summary: { type: 'STRING' },
-                warnings: { type: 'ARRAY', items: { type: 'STRING' } },
+                required: ['date', 'description', 'amount', 'direction', 'category', 'confidence'],
               },
-              required: ['transactions', 'summary', 'warnings'],
             },
+            summary: { type: 'STRING' },
+            warnings: { type: 'ARRAY', items: { type: 'STRING' } },
           },
-        }),
+          required: ['transactions', 'summary', 'warnings'],
+        },
       },
-      GEMINI_TIMEOUT_MS,
-    );
-    const result = (await response.json()) as {
-      error?: { message?: string };
-      candidates?: Array<{ content?: { parts?: GeminiPart[] } }>;
-    };
-    if (!response.ok) {
+    });
+    let response: Response | undefined;
+    let result:
+      | {
+          error?: { message?: string };
+          candidates?: Array<{ content?: { parts?: GeminiPart[] } }>;
+        }
+      | undefined;
+    const models = [...new Set([MODEL, ...MODEL_FALLBACKS])];
+    let usedModel = MODEL;
+    for (const model of models) {
+      usedModel = model;
+      response = await fetchWithTimeout(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-goog-api-key': geminiKey,
+          },
+          body: requestBody,
+        },
+        GEMINI_TIMEOUT_MS,
+      );
+      result = (await response.json()) as {
+        error?: { message?: string };
+        candidates?: Array<{ content?: { parts?: GeminiPart[] } }>;
+      };
+      if (response.ok || ![400, 403, 404].includes(response.status)) break;
+    }
+    if (!response || !result || !response.ok) {
       console.error(
         JSON.stringify({
           event: 'nivo_ai_provider_error',
-          status: response.status,
-          providerMessage: result.error?.message?.slice(0, 240) || 'unknown',
+          status: response?.status,
+          attemptedModels: models,
+          providerMessage: result?.error?.message?.slice(0, 240) || 'unknown',
         }),
       );
-      return res.status(502).json({ error: 'Le service IA a refusé l’image.' });
+      return res.status(502).json({ error: providerError(response?.status) });
     }
 
     const text = result.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('');
@@ -265,7 +287,7 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
             .filter((warning): warning is string => typeof warning === 'string')
             .slice(0, 8)
         : [],
-      model: MODEL,
+      model: usedModel,
     });
   } catch (cause) {
     console.error(
