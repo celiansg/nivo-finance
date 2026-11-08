@@ -22,7 +22,7 @@ const secondaryNav = [
 ];
 const allNav = [...primaryNav, ...secondaryNav];
 export function Layout({ children, onAdd }: { children: ReactNode; onAdd: () => void }) {
-  const { data, toast, syncState } = useFinance();
+  const { data, toast, syncState, reload } = useFinance();
   const { user } = useAuth();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -118,6 +118,15 @@ export function Layout({ children, onAdd }: { children: ReactNode; onAdd: () => 
               <i />
               {syncLabel}
             </span>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Actualiser les données"
+              title="Actualiser les données"
+              onClick={() => void reload()}
+            >
+              <Icon name="RefreshCw" size={16} />
+            </button>
           </div>
         </header>
         <main id="main-content">{children}</main>

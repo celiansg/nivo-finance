@@ -62,6 +62,7 @@ import {
   EyeOff,
   Square,
   Copy,
+  RefreshCw,
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useRef, type ReactNode } from 'react';
@@ -129,6 +130,7 @@ const icons: Record<string, LucideIcon> = {
   EyeOff,
   Square,
   Copy,
+  RefreshCw,
 };
 export function Icon({
   name = 'Wallet',

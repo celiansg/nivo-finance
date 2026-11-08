@@ -61,7 +61,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setError('');
     setSyncState(navigator.onLine ? 'connecting' : 'offline');
     try {
-      const next = await fetchData();
+      const next = await fetchData({ serverOnly: true });
       await ensureUserDefaults(next);
       setData(next);
       setSyncState('synced');
@@ -78,7 +78,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     const handleOnline = () => {
       setSyncState('connecting');
       if (!user) return;
-      void fetchData()
+      void fetchData({ serverOnly: true })
         .then((next) => {
           setData(next);
           setError('');
@@ -96,6 +96,26 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('offline', handleOffline);
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return;
+      setSyncState('connecting');
+      void fetchData({ serverOnly: true })
+        .then((next) => {
+          setData(next);
+          setError('');
+          setSyncState('synced');
+        })
+        .catch((cause: unknown) => {
+          setError(dataError(cause));
+          setSyncState('error');
+        });
+    };
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => document.removeEventListener('visibilitychange', refreshWhenVisible);
+  }, [user?.uid]);
 
   useEffect(() => {
     if (authLoading) return;

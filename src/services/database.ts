@@ -3,6 +3,7 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  getDocsFromServer,
   onSnapshot,
   setDoc,
   writeBatch,
@@ -59,11 +60,13 @@ const defaultCategories: Array<Pick<Tables['categories'], 'id' | 'name' | 'icon'
   ['autre', 'Autre', 'Shapes', '#8E9BAD'],
 ].map(([id, name, icon, color]) => ({ id, name, icon, color }));
 
-export async function fetchData(): Promise<Data> {
+export async function fetchData(options: { serverOnly?: boolean } = {}): Promise<Data> {
   const result = emptyData();
   await Promise.all(
     TABLES.map(async (table) => {
-      const snapshot = await getDocs(userCollection(table));
+      const snapshot = options.serverOnly
+        ? await getDocsFromServer(userCollection(table))
+        : await getDocs(userCollection(table));
       Object.assign(result, {
         [table]: snapshot.docs.map((item) => item.data() as Tables[typeof table]),
       });
