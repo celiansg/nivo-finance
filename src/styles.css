@@ -4702,6 +4702,17 @@ body::before {
   }
 }
 
+/* The page canvas stays white in light/automatic mode. Purple surfaces and
+   cards keep their own treatment, while Safari/iOS overscroll remains white. */
+:root[data-theme='light'] {
+  background-color: #ffffff;
+  color-scheme: light;
+}
+:root[data-theme='light'] body,
+:root[data-theme='light'] body::before {
+  background: #ffffff;
+}
+
 .ai-import-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.75fr);

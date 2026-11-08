@@ -145,7 +145,7 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
                 >
                   <option value="light">Clair</option>
                   <option value="dark">Sombre</option>
-                  <option value="system">Automatique</option>
+                  <option value="system">Automatique (fond clair)</option>
                 </select>
               </label>
               <label className="field">

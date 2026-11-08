@@ -141,16 +141,17 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const preference = data.settings[0]?.theme ?? 'system';
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
     const applyTheme = () => {
-      const dark = preference === 'dark' || (preference === 'system' && media.matches);
+      // Keep the automatic mode on the light canvas so Safari/iOS cannot turn
+      // the financial workspace black just because the device uses dark mode.
+      // Users can still opt into the dark theme explicitly from Settings.
+      const dark = preference === 'dark';
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
       document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#11101a' : '#f8f7fb');
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#11101a' : '#ffffff');
     };
     applyTheme();
-    if (preference === 'system') media.addEventListener('change', applyTheme);
-    return () => media.removeEventListener('change', applyTheme);
+    return undefined;
   }, [data.settings]);
 
   async function save<K extends Table>(table: K, record: Tables[K]) {
