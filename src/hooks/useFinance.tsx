@@ -8,6 +8,7 @@ import {
   postDueRecurringIncome,
   restoreData,
   saveRecord,
+  saveRecords,
   subscribeData,
 } from '../services/database';
 import { money } from '../utils/finance';
@@ -22,6 +23,7 @@ type Store = {
   syncState: 'connecting' | 'synced' | 'offline' | 'error';
   money: (n: number) => string;
   save: <K extends Table>(table: K, record: Tables[K]) => Promise<void>;
+  saveMany: <K extends Table>(table: K, records: Tables[K][]) => Promise<void>;
   remove: (table: Table, id: string) => Promise<void>;
   notify: (message: string) => void;
   reload: () => Promise<void>;
@@ -77,7 +79,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       setSyncState('connecting');
       if (!user) return;
       void fetchData()
-        .then(() => {
+        .then((next) => {
+          setData(next);
           setError('');
           setSyncState('synced');
         })
@@ -137,10 +140,17 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   }, [user?.uid, authLoading]);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = data.settings[0]?.theme === 'dark' ? 'dark' : 'light';
-    return () => {
-      document.documentElement.dataset.theme = 'light';
+    const preference = data.settings[0]?.theme ?? 'system';
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const applyTheme = () => {
+      const dark = preference === 'dark' || (preference === 'system' && media.matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#11101a' : '#f8f7fb');
     };
+    applyTheme();
+    if (preference === 'system') media.addEventListener('change', applyTheme);
+    return () => media.removeEventListener('change', applyTheme);
   }, [data.settings]);
 
   async function save<K extends Table>(table: K, record: Tables[K]) {
@@ -162,6 +172,20 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       }
       setSyncState('synced');
       notify(posted ? 'Revenu ajouté automatiquement' : 'Modification enregistrée');
+    } catch (cause) {
+      setSyncState(navigator.onLine ? 'error' : 'offline');
+      throw cause;
+    }
+  }
+
+  async function saveMany<K extends Table>(table: K, records: Tables[K][]) {
+    if (!records.length) return;
+    records.forEach((record) => validateChange(data, table, record));
+    setSyncState(navigator.onLine ? 'connecting' : 'offline');
+    try {
+      await saveRecords(table, records);
+      setSyncState('synced');
+      notify(`${records.length} opérations enregistrées`);
     } catch (cause) {
       setSyncState(navigator.onLine ? 'error' : 'offline');
       throw cause;
@@ -235,6 +259,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         syncState,
         money: (amount) => money(amount, data.settings[0]?.currency ?? 'EUR'),
         save,
+        saveMany,
         remove,
         notify,
         reload,

@@ -20,7 +20,7 @@ Dans la [console Firebase](https://console.firebase.google.com/project/finances-
 3. Ouvrir l’onglet **Users**, puis ajouter manuellement un utilisateur si vous voulez conserver un compte déjà créé.
 4. Ne pas communiquer un mot de passe et ne l’ajouter à aucun fichier du projet.
 
-La page `/login` propose maintenant la connexion et la création d’un compte. Une création réussie envoie un e-mail de vérification, puis déconnecte immédiatement le nouvel utilisateur jusqu’à ce qu’il confirme son adresse. Le mot de passe est transmis directement à Firebase Authentication et n’est jamais écrit par Nivo.
+La page `/login` est volontairement privée : elle propose uniquement la connexion, la déconnexion et la réinitialisation du mot de passe. Les utilisateurs sont créés depuis **Firebase Authentication → Users**. Le mot de passe est transmis directement à Firebase Authentication et n’est jamais écrit par Nivo.
 
 Dans **Authentication → Settings → Authorized domains**, ajouter `127.0.0.1` pour le développement local et `VOTRE_COMPTE.github.io` pour GitHub Pages.
 
@@ -170,7 +170,7 @@ FIREBASE_API_KEY=votre_cle_Web_Firebase
 ## Architecture d’authentification
 
 ```text
-src/contexts/AuthContext.tsx     # user, loading, login, createAccount, logout, resetPassword
+src/contexts/AuthContext.tsx     # user, loading, login, logout, resetPassword
 src/components/ProtectedRoute.tsx
 src/pages/Login.tsx
 src/services/firebase.ts         # initialisation Firebase

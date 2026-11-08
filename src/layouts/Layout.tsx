@@ -7,8 +7,8 @@ import { GlassLayers, Icon } from '../components/ui';
 import { NivoLogo } from '../components/BrandLogo';
 const primaryNav = [
   ['/', 'Accueil', 'LayoutDashboard'],
-  ['/transactions', 'Transactions', 'ArrowLeftRight'],
-  ['/gerer-mon-argent', 'Gérer mon argent', 'ChartNoAxesCombined'],
+  ['/transactions', 'Opérations', 'ArrowLeftRight'],
+  ['/gerer-mon-argent', 'Pilotage', 'ChartNoAxesCombined'],
   ['/assistant', 'Assistant', 'Sparkles'],
 ];
 const secondaryNav = [
@@ -45,6 +45,7 @@ export function Layout({ children, onAdd }: { children: ReactNode; onAdd: () => 
   }[syncState];
   return (
     <div className="app-layout">
+      <a className="skip-link" href="#main-content">Aller au contenu</a>
       <aside className="sidebar glass-surface">
         <GlassLayers />
         <NavLink className="brand" to="/" aria-label="Accueil Nivo">
@@ -119,7 +120,7 @@ export function Layout({ children, onAdd }: { children: ReactNode; onAdd: () => 
             </span>
           </div>
         </header>
-        <main>{children}</main>
+        <main id="main-content">{children}</main>
         <footer className="desktop-footer">
           {APP_NAME} Finance <span>Un regard serein sur votre argent.</span>
         </footer>
@@ -151,7 +152,7 @@ export function Layout({ children, onAdd }: { children: ReactNode; onAdd: () => 
               </button>
             </div>
             <div className="mobile-more-grid">
-              {[...secondaryNav, ['/assistant', 'Assistant', 'Sparkles']].map(([path, label, icon]) => (
+              {secondaryNav.map(([path, label, icon]) => (
                 <NavLink key={path} to={path}>
                   <Icon name={icon} />
                   <span>{label}</span>

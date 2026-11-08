@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useFinance } from '../hooks/useFinance';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, Badge, Icon, SectionTitle } from '../components/ui';
@@ -16,7 +16,7 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
   const initial = data.settings[0];
   const [name, setName] = useState(initial?.name ?? ''),
     [theme, setTheme] = useState<SettingsType['theme']>(
-      initial?.theme === 'dark' ? 'dark' : 'light',
+      initial?.theme ?? 'system',
     ),
     [currency, setCurrency] = useState(initial?.currency ?? 'EUR'),
     [day, setDay] = useState(initial?.budget_day ?? 1),
@@ -25,6 +25,13 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
     [backup, setBackup] = useState<Data | null>(null),
     [backupName, setBackupName] = useState(''),
     [importBusy, setImportBusy] = useState(false);
+  useEffect(() => {
+    if (!initial) return;
+    setName(initial.name);
+    setTheme(initial.theme);
+    setCurrency(initial.currency);
+    setDay(initial.budget_day);
+  }, [initial?.id]);
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -73,6 +80,7 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
   }
 
   function exportData() {
+    if (!window.confirm('Cette sauvegarde JSON n’est pas chiffrée et contient vos données financières. Enregistrer le fichier sur un appareil de confiance ?')) return;
     downloadBackup(data, 'nivo-personnel');
     notify('Export téléchargé');
   }
@@ -126,21 +134,23 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
             <div className="form-grid">
               <label className="field full">
                 <span>Votre prénom</span>
-                <input maxLength={50} value={name} onChange={(e) => setName(e.target.value)} />
+                <input name="name" maxLength={50} value={name} onChange={(e) => setName(e.target.value)} />
               </label>
               <label className="field">
                 <span>Apparence</span>
                 <select
+                  name="theme"
                   value={theme}
                   onChange={(e) => setTheme(e.target.value as SettingsType['theme'])}
                 >
                   <option value="light">Clair</option>
                   <option value="dark">Sombre</option>
+                  <option value="system">Automatique</option>
                 </select>
               </label>
               <label className="field">
                 <span>Devise d’affichage</span>
-                <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                <select name="currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
                   <option>EUR</option>
                   <option>USD</option>
                   <option>GBP</option>
@@ -149,7 +159,7 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
               </label>
               <label className="field">
                 <span>Début du mois budgétaire</span>
-                <select value={day} onChange={(e) => setDay(Number(e.target.value))}>
+                <select name="budget_day" value={day} onChange={(e) => setDay(Number(e.target.value))}>
                   {Array.from({ length: 28 }, (_, i) => (
                     <option key={i + 1} value={i + 1}>
                       Le {i + 1}
@@ -179,12 +189,12 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
           <div className="stack-actions">
             <button className="button" onClick={exportData}>
               <Icon name="Download" />
-              Exporter mes données JSON
+              Exporter JSON non chiffré
             </button>
             <label className="button file-button">
               <Icon name="Upload" />
               Choisir une sauvegarde
-              <input type="file" accept="application/json,.json" onChange={selectBackup} />
+              <input name="backup" type="file" accept="application/json,.json" onChange={selectBackup} />
             </label>
             {backup && (
               <div className="restore-preview" role="status">
@@ -220,7 +230,8 @@ export function Settings({ edit }: { edit: (r: EditorRequest) => void }) {
           </div>
           <p className="form-hint spaced">
             La restauration remplace les données actuelles après votre validation. Exportez une
-            copie avant de restaurer une ancienne sauvegarde.
+            copie avant de restaurer une ancienne sauvegarde. Les exports JSON sont lisibles :
+            conservez-les dans un emplacement de confiance et supprimez-les après usage.
           </p>
         </Card>
       </div>

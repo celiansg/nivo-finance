@@ -1,7 +1,7 @@
 /* global caches, clients, fetch, Response, URL, self */
 
 const CACHE_PREFIX = 'nivo-shell-';
-const CACHE_NAME = `${CACHE_PREFIX}v2`;
+const CACHE_NAME = `${CACHE_PREFIX}v3`;
 
 const assetUrls = [
   './',

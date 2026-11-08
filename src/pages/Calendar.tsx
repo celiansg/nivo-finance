@@ -90,6 +90,8 @@ export function Calendar({ edit }: { edit: (r: EditorRequest) => void }) {
                   key={date}
                   onClick={() => setSelected(date)}
                   className={`${date === selected ? 'selected' : ''} ${date === iso() ? 'is-today' : ''}`}
+                  aria-label={`${new Date(`${date}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${daily.length ? `, ${daily.length} opération${daily.length > 1 ? 's' : ''}` : ', aucune opération'}`}
+                  aria-current={date === iso() ? 'date' : undefined}
                 >
                   <span>{i + 1}</span>
                   <div className="day-dots">

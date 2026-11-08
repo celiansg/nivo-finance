@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { Icon } from '../ui';
 
-export function ChatComposer({ value, onChange, onSubmit, onAttach, disabled, thinking, attachmentName }: {
+export function ChatComposer({ value, onChange, onSubmit, onAttach, onCancel, disabled, thinking, attachmentName }: {
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
   onAttach: (file: File) => void;
+  onCancel?: () => void;
   disabled?: boolean;
   thinking?: boolean;
   attachmentName?: string;
@@ -34,6 +35,7 @@ export function ChatComposer({ value, onChange, onSubmit, onAttach, disabled, th
         <textarea
           ref={textareaRef}
           rows={1}
+          name="question"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={submitOnKeyDown}
@@ -42,11 +44,11 @@ export function ChatComposer({ value, onChange, onSubmit, onAttach, disabled, th
           disabled={disabled}
         />
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) onAttach(file); event.currentTarget.value = ''; }} />
-        <button type="submit" className="assistant-send" aria-label={thinking ? 'Analyse en cours' : 'Envoyer'} disabled={disabled || !value.trim()}>
-          {thinking ? <span className="assistant-send-dots" aria-hidden="true"><i /><i /><i /></span> : <Icon name="ArrowUp" size={18} />}
+        <button type={thinking ? 'button' : 'submit'} className="assistant-send" aria-label={thinking ? 'Arrêter l’analyse' : 'Envoyer'} onClick={thinking ? onCancel : undefined} disabled={disabled || (!thinking && !value.trim())}>
+          {thinking ? <Icon name="Square" size={15} /> : <Icon name="ArrowUp" size={18} />}
         </button>
       </div>
-      <div className="assistant-composer-footer"><span><Icon name="CornerDownLeft" size={13} /> Entrée pour envoyer · Maj + Entrée pour aller à la ligne</span><span>Vos données restent dans Nivo</span></div>
+      <div className="assistant-composer-footer"><span><Icon name="CornerDownLeft" size={13} /> Entrée pour envoyer · Maj + Entrée pour aller à la ligne</span><span>Contexte financier limité</span></div>
     </form>
   );
 }

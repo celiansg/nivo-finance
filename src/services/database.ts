@@ -126,6 +126,16 @@ export async function saveRecord<K extends Table>(table: K, record: Tables[K]) {
   await setDoc(userDocument(table, record.id), record);
 }
 
+export async function saveRecords<K extends Table>(table: K, records: Tables[K][]) {
+  for (let index = 0; index < records.length; index += 450) {
+    const batch = writeBatch(db);
+    for (const record of records.slice(index, index + 450)) {
+      batch.set(userDocument(table, record.id), record);
+    }
+    await batch.commit();
+  }
+}
+
 export async function postDueRecurringIncome(data: Data, today?: string) {
   const plan = dueIncomePostings(data, today);
   const writes: Array<{

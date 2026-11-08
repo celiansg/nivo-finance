@@ -6,6 +6,7 @@ import { Card, Icon, SectionTitle } from '../components/ui';
 import { NivoMark } from '../components/BrandLogo';
 import type { Category, Data, TransactionType } from '../types';
 import { answerFinancialQuestion, buildFinancialInsights } from '../utils/insights';
+import { accountBalance } from '../utils/finance';
 import { ChatComposer } from '../components/assistant/ChatComposer';
 import { ConversationThread } from '../components/assistant/ConversationThread';
 import { SuggestionChips, type Suggestion } from '../components/assistant/SuggestionChips';
@@ -157,7 +158,7 @@ function buildAssistantContext(data: Data) {
     accounts: data.accounts.map((account) => ({
       name: account.name,
       type: account.type,
-      balance: account.balance,
+      balance: accountBalance(account, data.transactions),
     })),
     subscriptions: data.subscriptions.filter((subscription) => subscription.active).map((subscription) => ({
       name: subscription.name,
@@ -223,8 +224,8 @@ async function requestAssistantChat({
 
 export function AIAssistant() {
   const { user } = useAuth();
-  const { data, save, money, notify } = useFinance();
-  const [searchParams] = useSearchParams();
+  const { data, saveMany, money, notify } = useFinance();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState('');
   const [accountId, setAccountId] = useState(data.accounts[0]?.id ?? '');
@@ -238,6 +239,14 @@ export function AIAssistant() {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [thinking, setThinking] = useState(false);
   const requestController = useRef<AbortController | null>(null);
+
+  function changeMode(next: 'chat' | 'import') {
+    setMode(next);
+    const params = new URLSearchParams(searchParams);
+    if (next === 'import') params.set('mode', 'import');
+    else params.delete('mode');
+    setSearchParams(params, { replace: true });
+  }
 
   useEffect(() => {
     if (!accountId && data.accounts[0]) setAccountId(data.accounts[0].id);
@@ -326,7 +335,7 @@ export function AIAssistant() {
 
   function attachFromComposer(next: File) {
     chooseFile(next);
-    setMode('import');
+    changeMode('import');
   }
 
   function chooseFile(next: File | undefined) {
@@ -443,9 +452,9 @@ export function AIAssistant() {
     setError('');
     let imported = 0;
     try {
-      for (const row of rows) {
+      const importedRecords = rows.map((row) => {
         const sourceEventId = `ai-import-${row.date}-${row.amount.toFixed(2)}-${normalize(row.description).replace(/\s+/g, '-')}`;
-        await save('transactions', {
+        return {
           id: crypto.randomUUID(),
           created_at: new Date().toISOString(),
           amount: row.amount,
@@ -458,9 +467,10 @@ export function AIAssistant() {
           time: '12:00',
           description: row.description,
           note: 'Importé depuis un relevé bancaire avec Nivo IA',
-        });
-        imported += 1;
-      }
+        };
+      });
+      await saveMany('transactions', importedRecords);
+      imported = importedRecords.length;
       notify(`${imported} opération${imported > 1 ? 's' : ''} ajoutée${imported > 1 ? 's' : ''}`);
       const importedIds = new Set(
         rows.map((row) => `${row.date}-${row.amount}-${row.description}`),
@@ -489,17 +499,18 @@ export function AIAssistant() {
     <div className="assistant-page">
       <header className="assistant-header">
         <div className="assistant-header-brand"><span className="assistant-header-mark"><NivoMark size={24} /></span><div><span className="eyebrow">NIVO IA</span><h1>Assistant Nivo</h1><p>Comprendre vos finances, prendre de meilleures décisions.</p></div></div>
-        <div className="assistant-header-actions"><span className="assistant-mode-label"><Icon name="ShieldCheck" size={14} /> Chatbot privé · données Nivo</span><button className="button" type="button" onClick={startNewDiscussion} disabled={thinking}><Icon name="Plus" size={16} /> Nouvelle discussion</button></div>
+        <div className="assistant-header-actions"><span className="assistant-mode-label"><Icon name="ShieldCheck" size={14} /> Vos données servent uniquement à cette réponse</span><button className="button" type="button" onClick={startNewDiscussion} disabled={thinking}><Icon name="Plus" size={16} /> Nouvelle discussion</button></div>
       </header>
+      <p className="assistant-privacy-note">Les calculs locaux restent sur votre appareil. Si le moteur conversationnel est utilisé, un contexte financier limité est transmis au fournisseur IA pour générer la réponse.</p>
       <div className="assistant-mode-switch" role="tablist" aria-label="Fonctionnalités de Nivo IA">
-        <button role="tab" aria-selected={mode === 'chat'} className={mode === 'chat' ? 'active' : ''} onClick={() => setMode('chat')}><Icon name="Sparkles" size={16} /> Conversation</button>
-        <button role="tab" aria-selected={mode === 'import'} className={mode === 'import' ? 'active' : ''} onClick={() => setMode('import')}><Icon name="Upload" size={16} /> Importer une capture</button>
+        <button role="tab" aria-selected={mode === 'chat'} className={mode === 'chat' ? 'active' : ''} onClick={() => changeMode('chat')}><Icon name="Sparkles" size={16} /> Conversation</button>
+        <button role="tab" aria-selected={mode === 'import'} className={mode === 'import' ? 'active' : ''} onClick={() => changeMode('import')}><Icon name="Upload" size={16} /> Importer une capture</button>
       </div>
       {mode === 'chat' && (
         <section className={`assistant-workspace ${messages.length ? 'has-messages' : 'is-empty'}`} aria-label="Conversation avec Nivo">
           {!messages.length ? <div className="assistant-empty-state"><span className="assistant-empty-orb"><NivoMark size={30} /></span><h2>Bonjour 👋<br />Comment puis-je vous aider aujourd’hui&nbsp;?</h2><p>Parlez naturellement à Nivo : dépenses, abonnements, budget, projets ou épargne. Les chiffres viennent de vos données privées.</p><SuggestionChips suggestions={assistantSuggestions} onSelect={askAssistant} /></div> : <ConversationThread messages={messages} insights={buildFinancialInsights(data)} money={money} currency={currency} />}
           {messages.length > 0 && thinking && <div className="assistant-thinking" role="status"><span className="assistant-message-avatar"><Icon name="Sparkles" size={14} /></span><span>Nivo analyse vos opérations <i /><i /><i /></span></div>}
-          <div className="assistant-composer-dock"><ChatComposer value={question} onChange={setQuestion} onSubmit={() => askAssistant()} onAttach={attachFromComposer} disabled={thinking} thinking={thinking} attachmentName={file?.name} /></div>
+          <div className="assistant-composer-dock"><ChatComposer value={question} onChange={setQuestion} onSubmit={() => askAssistant()} onAttach={attachFromComposer} onCancel={() => requestController.current?.abort()} disabled={false} thinking={thinking} attachmentName={file?.name} /></div>
         </section>
       )}
       {mode === 'import' && <>
@@ -508,7 +519,7 @@ export function AIAssistant() {
           <SectionTitle title="1. Ajoutez une capture" />
           <label className="ai-dropzone" htmlFor="bank-screenshot">
             {preview ? (
-              <img src={preview} alt="Aperçu de la capture bancaire" />
+              <img src={preview} alt="Aperçu de la capture bancaire" width={800} height={500} />
             ) : (
               <>
                 <span className="ai-upload-icon">
@@ -528,7 +539,7 @@ export function AIAssistant() {
           {file && <p className="ai-file-name">{file.name}</p>}
           <label className="field ai-account-field">
             <span>Compte à utiliser pour l’import</span>
-            <select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+            <select name="account" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
               <option value="">Choisir un compte…</option>
               {data.accounts.map((account) => (
                 <option key={account.id} value={account.id}>
@@ -560,7 +571,7 @@ export function AIAssistant() {
             <Icon name="ShieldCheck" />
             <span>
               <strong>Clé protégée</strong>
-              <small>La clé IA reste côté serveur.</small>
+              <small>La clé IA reste côté serveur ; elle n’est jamais envoyée au navigateur.</small>
             </span>
           </div>
           <div className="ai-privacy-item">
@@ -578,6 +589,7 @@ export function AIAssistant() {
             </span>
           </div>
           <div className="ai-privacy-note">
+            La capture est transmise à Google Gemini pour l’analyse, puis Nivo ne la conserve pas.
             Pour votre sécurité, une capture partielle ne déclenche jamais la suppression
             d’opérations existantes.
           </div>

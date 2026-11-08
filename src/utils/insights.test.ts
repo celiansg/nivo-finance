@@ -69,6 +69,24 @@ describe('financial insights', () => {
     expect(insights.disposableKnown).toBe(true);
   });
 
+  it('uses the configured budget day and keeps the source account on detections', () => {
+    const data: Data = {
+      ...base,
+      settings: [{ ...base.settings[0], budget_day: 15 }],
+      transactions: [
+        transaction('income-before', '2026-03-10', 'Salaire', 1800, 'income'),
+        transaction('income-after', '2026-03-16', 'Salaire', 1800, 'income'),
+        transaction('s1', '2026-02-20', 'Cloud Music', 9.99),
+        transaction('s2', '2026-03-20', 'Cloud Music', 9.99),
+        transaction('s3', '2026-04-20', 'Cloud Music', 9.99),
+      ],
+    };
+    const insights = buildFinancialInsights(data, new Date('2026-03-20T12:00:00Z'));
+    expect(insights.start).toBe('2026-03-15');
+    expect(insights.income).toBe(1800);
+    expect(detectRecurringCandidates(data, new Date('2026-04-25T12:00:00Z'))[0].accountId).toBe('account');
+  });
+
   it('keeps a savings scenario read-only and explains feasibility', () => {
     const insights = buildFinancialInsights(base, new Date('2026-03-20T12:00:00Z'));
     const scenario = simulateMonthlySavings({ ...insights, disposable: 250, disposableKnown: true }, 100);

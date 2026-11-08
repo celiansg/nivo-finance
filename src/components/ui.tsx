@@ -60,6 +60,8 @@ import {
   Mail,
   Eye,
   EyeOff,
+  Square,
+  Copy,
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useRef, type ReactNode } from 'react';
@@ -125,18 +127,22 @@ const icons: Record<string, LucideIcon> = {
   Mail,
   Eye,
   EyeOff,
+  Square,
+  Copy,
 };
 export function Icon({
   name = 'Wallet',
   size = 20,
+  'aria-hidden': ariaHidden = true,
   ...props
 }: {
   name?: string;
   size?: number;
   className?: string;
+  'aria-hidden'?: boolean;
 }) {
   const Comp = icons[name] ?? Wallet;
-  return <Comp size={size} strokeWidth={1.7} {...props} />;
+  return <Comp size={size} strokeWidth={1.7} aria-hidden={ariaHidden} {...props} />;
 }
 export function Badge({ icon = 'Wallet', color = '#0A84FF' }: { icon?: string; color?: string }) {
   return (
@@ -264,6 +270,7 @@ export function Modal({
     <dialog
       ref={ref}
       className="modal"
+      aria-labelledby="nivo-modal-title"
       onCancel={onClose}
       onClick={(e) => {
         if (e.target === ref.current) onClose();
@@ -272,7 +279,7 @@ export function Modal({
       <GlassLayers />
       <div className="modal-inner">
         <div className="section-title">
-          <h2>{title}</h2>
+          <h2 id="nivo-modal-title">{title}</h2>
           <button className="icon-button" aria-label="Fermer" onClick={onClose}>
             <Icon name="X" />
           </button>

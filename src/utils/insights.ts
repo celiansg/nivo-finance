@@ -1,5 +1,5 @@
 import type { Data, Frequency, Goal, Transaction } from '../types';
-import { monthlyCost, parseDate, period, round } from './finance';
+import { accountBalance, monthlyCost, parseDate, period, round } from './finance';
 
 export type RecurringCandidate = {
   id: string;
@@ -16,6 +16,7 @@ export type RecurringCandidate = {
   lastDate: string;
   nextDate: string;
   categoryId: string | null;
+  accountId: string | null;
 };
 
 export type GoalInsight = Goal & {
@@ -111,7 +112,9 @@ function candidateFromGroup(
   rows: Transaction[],
   categoryId: string | null,
 ): RecurringCandidate | null {
-  if (rows.length < 2 || isBlockedMerchant(rows[0].description)) return null;
+  // Two identical purchases are not enough to call something a subscription.
+  // Keep the detector conservative: three occurrences provide a meaningful cadence.
+  if (rows.length < 3 || isBlockedMerchant(rows[0].description)) return null;
   const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
   const intervals = sorted.slice(1).map((row, index) => daysBetween(sorted[index].date, row.date));
   const average = intervals.reduce((sum, value) => sum + value, 0) / intervals.length;
@@ -148,6 +151,7 @@ function candidateFromGroup(
     lastDate,
     nextDate: dateAfter(lastDate, intervalDays),
     categoryId: category,
+    accountId: [...new Set(sorted.map((row) => row.account_id))].length === 1 ? sorted[0].account_id : null,
   };
 }
 
@@ -189,7 +193,7 @@ function savedForGoal(data: Data, goalId: string) {
 
 export function buildFinancialInsights(data: Data, now = new Date()): FinancialInsights {
   const today = now.toISOString().slice(0, 10);
-  const currentPeriod = period(now, 1);
+  const currentPeriod = period(now, data.settings[0]?.budget_day ?? 1);
   const transactions = data.transactions.filter(
     (transaction) => transaction.date >= currentPeriod.start && transaction.date <= today,
   );
@@ -227,7 +231,9 @@ export function buildFinancialInsights(data: Data, now = new Date()): FinancialI
       .filter((item) => item.active && item.type === 'transfer')
       .reduce((sum, item) => sum + monthlyRecurringAmount(item.amount, item.frequency, item.interval_days), 0),
   );
-  const disposable = round((income || incomeExpected) - fixedExpenses - variableExpenses - plannedSavings);
+  // Actual income is the reliable baseline. Expected recurring income is shown separately;
+  // it must not silently replace a real but partial month and inflate the available balance.
+  const disposable = round(income - fixedExpenses - variableExpenses - plannedSavings);
   const hasIncome = income > 0 || incomeExpected > 0;
   const dataCompleteness = !data.accounts.length && !data.transactions.length
     ? 'empty'
@@ -267,7 +273,7 @@ export function buildFinancialInsights(data: Data, now = new Date()): FinancialI
     variableExpenses,
     plannedSavings,
     disposable,
-    disposableKnown: hasIncome,
+    disposableKnown: income > 0,
     dataCompleteness,
     knownSubscriptionsMonthly,
     knownSubscriptionsAnnual,
@@ -291,11 +297,6 @@ export function simulateMonthlySavings(insights: FinancialInsights, amount: numb
 
 function formatMoney(amount: number, currency: string) {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency, maximumFractionDigits: 2 }).format(amount);
-}
-
-function previousMonthKey(now: Date) {
-  const date = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
 export function answerFinancialQuestion(question: string, data: Data, now = new Date()): AssistantAnswer {
@@ -324,16 +325,51 @@ export function answerFinancialQuestion(question: string, data: Data, now = new 
       : { text: `Vos abonnements confirmés représentent ${formatMoney(insights.knownSubscriptionsMonthly, currency)} par mois, soit ${formatMoney(insights.knownSubscriptionsAnnual, currency)} par an. Je n’ai pas trouvé de nouvelle récurrence assez fiable à confirmer.`, sources: ['Abonnements confirmés', 'Transactions des 12 derniers mois'] };
   }
 
+  if (normalized.includes('ou va') || normalized.includes('repartition') || normalized.includes('categorie')) {
+    const top = insights.categorySpending.slice(0, 3);
+    return top.length
+      ? {
+          text: `Ce mois-ci, vos principales dépenses sont ${top.map((item) => `${item.label} (${formatMoney(item.amount, currency)})`).join(', ')}. Le total des dépenses variables connues est de ${formatMoney(insights.variableExpenses, currency)}.`,
+          sources: ['Transactions du mois', 'Catégories de dépenses'],
+        }
+      : {
+          text: 'Je n’ai pas encore assez d’opérations catégorisées pour expliquer où va votre argent. Importez ou ajoutez quelques transactions, puis reposez votre question.',
+          sources: ['Transactions du mois'],
+        };
+  }
+
+  if (normalized.includes('solde') || normalized.includes('combien sur') || normalized.includes('compte')) {
+    const balances = data.accounts.map((account) => `${account.name} : ${formatMoney(accountBalance(account, data.transactions), currency)}`);
+    return balances.length
+      ? { text: `Voici les soldes calculés à partir de vos opérations : ${balances.join(' · ')}.`, sources: ['Comptes', 'Transactions enregistrées'] }
+      : { text: 'Ajoutez d’abord un compte pour que je puisse calculer vos soldes.', sources: ['Comptes'] };
+  }
+
+  if (normalized.includes('revenu') || normalized.includes('salaire')) {
+    return {
+      text: `Vos revenus enregistrés sur la période sont de ${formatMoney(insights.income, currency)}${insights.incomeExpected ? `, avec environ ${formatMoney(insights.incomeExpected, currency)} de revenus récurrents attendus par mois` : ''}.`,
+      sources: ['Revenus enregistrés', 'Revenus récurrents'],
+    };
+  }
+
+  if (normalized.includes('reste') || normalized.includes('disponible') || normalized.includes('marge')) {
+    return insights.disposableKnown
+      ? { text: `Votre reste à vivre estimé est de ${formatMoney(insights.disposable, currency)} après les revenus enregistrés, les charges fixes, les dépenses variables et l’épargne planifiée. Ce montant repose sur les opérations connues de la période ${insights.start} au ${insights.end}.`, sources: ['Calcul financier Nivo', 'Opérations de la période'] }
+      : { text: 'Je ne peux pas encore calculer un reste à vivre fiable : enregistrez au moins un revenu réel et quelques dépenses sur la période.', sources: ['Opérations de la période'] };
+  }
+
   if (normalized.includes('augmente') || normalized.includes('augment') || normalized.includes('depense')) {
-    const previousMonth = previousMonthKey(now);
+    const budgetDay = data.settings[0]?.budget_day ?? 1;
+    const previousPeriodDate = parseDate(insights.start);
+    previousPeriodDate.setDate(previousPeriodDate.getDate() - 1);
+    const previous = period(previousPeriodDate, budgetDay);
     const currentByCategory = new Map<string, number>();
     const previousByCategory = new Map<string, number>();
-    const currentMonth = insights.start.slice(0, 7);
     for (const transaction of data.transactions) {
       if (transaction.type !== 'expense') continue;
       const key = transaction.category_id ?? 'uncategorized';
-      if (transaction.date.startsWith(currentMonth)) currentByCategory.set(key, (currentByCategory.get(key) ?? 0) + transaction.amount);
-      if (transaction.date.startsWith(previousMonth)) previousByCategory.set(key, (previousByCategory.get(key) ?? 0) + transaction.amount);
+      if (transaction.date >= insights.start && transaction.date <= insights.end) currentByCategory.set(key, (currentByCategory.get(key) ?? 0) + transaction.amount);
+      if (transaction.date >= previous.start && transaction.date <= previous.end) previousByCategory.set(key, (previousByCategory.get(key) ?? 0) + transaction.amount);
     }
     const increases = [...currentByCategory.entries()]
       .map(([categoryId, current]) => ({ categoryId, current, previous: previousByCategory.get(categoryId) ?? 0, label: categoryLabel(data, categoryId === 'uncategorized' ? null : categoryId) }))

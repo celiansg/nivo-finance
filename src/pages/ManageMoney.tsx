@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card, Empty, Icon, Progress, SectionTitle } from '../components/ui';
 import type { EditorRequest } from '../components/Editor';
 import { useFinance } from '../hooks/useFinance';
+import { useAuth } from '../contexts/AuthContext';
 import { buildFinancialInsights, simulateMonthlySavings, type RecurringCandidate } from '../utils/insights';
 import { shortDate } from '../utils/finance';
 import type { Tables } from '../types';
@@ -11,19 +12,49 @@ type Tab = 'overview' | 'subscriptions' | 'goals';
 
 export function ManageMoney({ edit }: { edit: (request: EditorRequest) => void }) {
   const { data, money, save, notify } = useFinance();
+  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
-  const [ignored, setIgnored] = useState<string[]>([]);
+  const [ignored, setIgnored] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(`nivo:ignored-recurring:${user?.uid ?? 'unknown'}`) ?? '[]') as string[];
+    } catch {
+      return [];
+    }
+  });
   const [scenarioAmount, setScenarioAmount] = useState('100');
   const [savingCandidate, setSavingCandidate] = useState<string | null>(null);
+  const [candidateAccounts, setCandidateAccounts] = useState<Record<string, string>>({});
   const insights = useMemo(() => buildFinancialInsights(data), [data]);
   const candidates = insights.candidates.filter((candidate) => !ignored.includes(candidate.id));
   const scenario = simulateMonthlySavings(insights, Number(scenarioAmount.replace(',', '.')) || 0);
   const currency = data.settings[0]?.currency ?? 'EUR';
 
+  function ignoreCandidate(id: string) {
+    setIgnored((current) => {
+      const next = current.includes(id) ? current : [...current, id];
+      try {
+        localStorage.setItem(`nivo:ignored-recurring:${user?.uid ?? 'unknown'}`, JSON.stringify(next));
+      } catch {
+        // Local persistence is optional; the detector remains usable in private browsing modes.
+      }
+      return next;
+    });
+  }
+
   async function confirmCandidate(candidate: RecurringCandidate) {
-    const account = data.accounts[0];
+    const account = candidate.accountId
+      ? data.accounts.find((item) => item.id === candidate.accountId)
+      : candidateAccounts[candidate.id]
+        ? data.accounts.find((item) => item.id === candidateAccounts[candidate.id])
+      : data.accounts.length === 1
+        ? data.accounts[0]
+        : undefined;
     if (!account) {
-      notify('Ajoutez d’abord un compte pour enregistrer cet abonnement.');
+      notify(
+        data.accounts.length > 1
+          ? 'Choisissez d’abord le compte source de cette récurrence.'
+          : 'Ajoutez d’abord un compte pour enregistrer cet abonnement.',
+      );
       return;
     }
     setSavingCandidate(candidate.id);
@@ -44,7 +75,7 @@ export function ManageMoney({ edit }: { edit: (request: EditorRequest) => void }
         active: true,
       };
       await save('subscriptions', subscription);
-      setIgnored((current) => [...current, candidate.id]);
+      ignoreCandidate(candidate.id);
       notify(`${candidate.name} ajouté à vos abonnements`);
     } catch (cause) {
       notify(cause instanceof Error ? cause.message : 'Impossible d’enregistrer cet abonnement.');
@@ -110,7 +141,7 @@ export function ManageMoney({ edit }: { edit: (request: EditorRequest) => void }
           <div className="manage-insight-grid">
             <Card>
               <SectionTitle title="Abonnements à vérifier"><button className="text-button" onClick={() => setTab('subscriptions')}>Voir tout <Icon name="ChevronRight" size={14} /></button></SectionTitle>
-              {candidates.slice(0, 3).map((candidate) => <CandidateRow key={candidate.id} candidate={candidate} money={money} onConfirm={() => void confirmCandidate(candidate)} onIgnore={() => setIgnored((current) => [...current, candidate.id])} saving={savingCandidate === candidate.id} />)}
+              {candidates.slice(0, 3).map((candidate) => <CandidateRow key={candidate.id} candidate={candidate} money={money} accountOptions={data.accounts} selectedAccount={candidateAccounts[candidate.id] ?? candidate.accountId ?? ''} onAccountChange={(value) => setCandidateAccounts((current) => ({ ...current, [candidate.id]: value }))} onConfirm={() => void confirmCandidate(candidate)} onIgnore={() => ignoreCandidate(candidate.id)} saving={savingCandidate === candidate.id} />)}
               {!candidates.length && <Empty text="Aucune récurrence à vérifier pour le moment." />}
             </Card>
             <Card>
@@ -132,7 +163,7 @@ export function ManageMoney({ edit }: { edit: (request: EditorRequest) => void }
             <div><span>3</span><strong>Vous confirmez l’abonnement</strong><small>Aucune écriture n’est créée automatiquement.</small></div>
           </div>
           <div className="manage-subscription-summary"><span><b>{money(insights.knownSubscriptionsMonthly)}</b><small>déjà confirmé / mois</small></span><span><b>{money(insights.knownSubscriptionsAnnual)}</b><small>équivalent annuel</small></span><Link className="button" to="/abonnements">Gérer mes abonnements</Link></div>
-          {candidates.map((candidate) => <CandidateRow key={candidate.id} candidate={candidate} money={money} onConfirm={() => void confirmCandidate(candidate)} onIgnore={() => setIgnored((current) => [...current, candidate.id])} saving={savingCandidate === candidate.id} />)}
+          {candidates.map((candidate) => <CandidateRow key={candidate.id} candidate={candidate} money={money} accountOptions={data.accounts} selectedAccount={candidateAccounts[candidate.id] ?? candidate.accountId ?? ''} onAccountChange={(value) => setCandidateAccounts((current) => ({ ...current, [candidate.id]: value }))} onConfirm={() => void confirmCandidate(candidate)} onIgnore={() => ignoreCandidate(candidate.id)} saving={savingCandidate === candidate.id} />)}
           {!candidates.length && <Empty text="Aucune détection en attente. Nivo a besoin de plusieurs opérations comparables." />}
           <div className="manage-source-note"><Icon name="Mail" size={17} /><span><strong>Détection par e-mail</strong><small>Connexion Gmail volontaire, OAuth et autorisations à configurer. Cette fonctionnalité n’est pas activée et aucune messagerie n’est lue.</small></span><button className="button" disabled>Bientôt disponible</button></div>
         </Card>
@@ -150,8 +181,9 @@ export function ManageMoney({ edit }: { edit: (request: EditorRequest) => void }
   );
 }
 
-function CandidateRow({ candidate, money, onConfirm, onIgnore, saving }: { candidate: RecurringCandidate; money: (amount: number) => string; onConfirm: () => void; onIgnore: () => void; saving: boolean }) {
-  return <div className="manage-candidate-row"><span className="manage-candidate-icon"><Icon name="Repeat" size={18} /></span><span className="manage-candidate-main"><strong>{candidate.name}</strong><small>{money(candidate.amount)} · {candidate.occurrences} occurrences · {Math.round(candidate.confidence * 100)} % de confiance</small><em>{candidate.reason}</em></span><span className="manage-candidate-cost"><b>{money(candidate.monthlyAmount)}</b><small>/ mois</small></span><button className="button compact" disabled={saving} onClick={onConfirm}>{saving ? '…' : 'Confirmer'}</button><button className="icon-button" aria-label={`Ignorer ${candidate.name}`} onClick={onIgnore}><Icon name="X" size={16} /></button></div>;
+function CandidateRow({ candidate, money, accountOptions = [], selectedAccount, onAccountChange, onConfirm, onIgnore, saving }: { candidate: RecurringCandidate; money: (amount: number) => string; accountOptions?: Array<{ id: string; name: string }>; selectedAccount?: string; onAccountChange?: (value: string) => void; onConfirm: () => void; onIgnore: () => void; saving: boolean }) {
+  const needsAccount = !candidate.accountId && accountOptions.length > 1;
+  return <div className="manage-candidate-row"><span className="manage-candidate-icon"><Icon name="Repeat" size={18} /></span><span className="manage-candidate-main"><strong>{candidate.name}</strong><small>{money(candidate.amount)} · {candidate.occurrences} occurrences · {Math.round(candidate.confidence * 100)} % de confiance</small><em>{candidate.reason}</em>{needsAccount && <select className="manage-candidate-account" aria-label={`Compte source de ${candidate.name}`} value={selectedAccount ?? ''} onChange={(event) => onAccountChange?.(event.target.value)}><option value="">Choisir le compte source…</option>{accountOptions.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select>}</span><span className="manage-candidate-cost"><b>{money(candidate.monthlyAmount)}</b><small>/ mois</small></span><button className="button compact" disabled={saving || needsAccount && !selectedAccount} onClick={onConfirm}>{saving ? '…' : 'Confirmer'}</button><button className="icon-button" aria-label={`Ignorer ${candidate.name}`} onClick={onIgnore}><Icon name="X" size={16} /></button></div>;
 }
 
 function GoalRow({ goal, money, detailed = false }: { goal: ReturnType<typeof buildFinancialInsights>['goals'][number]; money: (amount: number) => string; detailed?: boolean }) {
